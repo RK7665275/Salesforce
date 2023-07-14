@@ -1,0 +1,1711 @@
+/**
+ * @description       : 
+ * @author            : ChangeMeIn@UserSettingsUnder.SFDoc
+ * @group             : 
+ * @last modified on  : 01-10-2023
+ * @last modified by  : ChangeMeIn@UserSettingsUnder.SFDoc
+**/
+public with sharing class LightningTableApexController {
+    
+    @AuraEnabled
+    public static Integer extractTotalClients(String objectName, String duration){
+        
+        List<AggregateResult> groupedResults=new List<AggregateResult>();
+        String strQuery='SELECT Borrower_Name__c , count(Id) c FROM Loan__c';
+        
+        if(duration=='THIS_YEAR')
+            strQuery += ' where CreatedDate = LAST_N_DAYS:365';
+        else if(duration=='THIS_MONTH')
+            strQuery += ' where CreatedDate = LAST_N_DAYS:30';
+        
+        strQuery+=' WITH SECURITY_ENFORCED GROUP BY Borrower_Name__c';
+        groupedResults = Database.query(strQuery);  
+        return groupedResults.size();
+    }
+         @AuraEnabled
+    public static ChartDetails extractLead(String strStatus,Decimal pageNumber ,Integer recordToDisply,string SortColumnName,String SortBy, String schStr,String userFilter){
+        //String userFilter='hcbhuwuhcbhw';
+         //data filter code by shubham=========
+         system.debug('userFilter---->(( '+userFilter);
+         List < User > requiredUsers = new List < user > ();
+
+        Set < id > requiredUsersId = new Set < id > ();
+
+
+        if (userFilter.containsIgnoreCase('My Team')) {
+            requiredUsers = InfloHomePageController.NewgetUsersUnder(UserInfo.getUserId(), String.valueOf(Date.Today().Year()));
+            for (User u: requiredUsers) {
+                requiredUsersId.add(u.id);
+            }
+            System.debug('MyTeam'+requiredUsersId);
+        } else if (userFilter.containsIgnoreCase('My Company') || userFilter.containsIgnoreCase('All')) {
+            for (user u: [Select id from User WHERE IsActive = TRUE AND AccountId = NULL WITH SECURITY_ENFORCED LIMIT 40000]) {
+                requiredUsersId.add(u.id);
+            }
+            System.debug('MyComp'+requiredUsersId);
+        } else {
+            requiredUsersId.add(UserInfo.getUserId());
+            System.debug('My'+requiredUsersId);
+        }
+        //================data filter=================
+        Integer pageSize = recordToDisply;
+        Integer offset = ((Integer)pageNumber - 1) * pageSize;
+        Id clientRTID = Schema.SObjectType.Account.getRecordTypeInfosByName().get('Client').getRecordTypeId();
+        if(strStatus=='Leads'){
+             List<Account> finalaccList = new List<Account>();
+             List<Account> CountList = new List<Account>();
+             Integer LeadRed = 0;
+             Integer LeadGreen = 0;
+             Integer LeadYellow = 0;
+            if( userFilter != NULL && String.valueOf(userFilter).startsWith('003')){
+             String accQuery = 'SELECT Id, Loan_Type__c, CustomerPriority__c, AccountSource, Client_Referred_By__c, Partner_Referred_ByCon__c, Referred_By__c, Type, FirstName, LastName, Status__c, Last_Activity_Date__c,inflooens__Lead_Priority__c FROM Account where RecordTypeId =:clientRTID AND (Status__c =  \'New Leads\' OR Status__c = \'Recently Added\' OR  Status__c = \'Attempted Contact\' OR Status__c = \'Initial Discovery\') AND Co_Borrower_Customer__c = NULL AND Partner_Referred_ByCon__c= :userFilter ' ;
+        
+             if(SortBy=='ASC'||SortBy=='DESC'){
+                accQuery += ' WITH SECURITY_ENFORCED ORDER BY '+SortColumnName+' ' +SortBy+'  LIMIT :recordToDisply OFFSET :offset'; 
+             }
+             else{
+                accQuery +=' WITH SECURITY_ENFORCED LIMIT :recordToDisply OFFSET :offset';
+             }
+             // finalaccList = Database.query(accQuery);
+             
+
+              //search str
+              if (!String.isBlank(schStr)) {   
+
+                    String fields = 'Loan_Type__c, inflooens__CustomerPriority__c, AccountSource, Client_Referred_By__c, Partner_Referred_ByCon__c, inflooens__Referred_By__c, Type, FirstName, LastName, Status__c, Last_Activity_Date__c,inflooens__Lead_Priority__c';
+                    Map<String, String> objectFieldMap = new Map<String, String>{'Account'=> fields};
+                    Map<String, String> accountMap = new Map<String, String>{'Account'=> ' WHERE (Status__c = \'New Leads\' OR Status__c = \'Recently Added\') AND Co_Borrower_Customer__c = NULL'};
+                    Map<String, List<sObject>> accountResultMap = SOSLGenericController.soslReturn(schStr, objectFieldMap, accountMap); 
+                    finalaccList.addAll((List<Account>)accountResultMap.get('Account'));
+                    CountList = finalaccList.clone();
+
+              }else{
+                    finalaccList = Database.query(accQuery);
+
+              }
+              system.debug('LIST IN NEWLEADS###');
+
+              
+             ChartDetails objChart = new ChartDetails();
+             //objChart.y = Database.query(strQueryTotal).size();
+            
+             string totCount='SELECT Count(Id) tCount from Account where RecordTypeId =: clientRTID AND (Status__c =  \'New Leads\' OR Status__c = \'Recently Added\' OR  Status__c = \'Attempted Contact\' OR Status__c = \'Initial Discovery\') AND Co_Borrower_Customer__c = NULL AND Partner_Referred_ByCon__c=:userFilter ';
+             AggregateResult totalcount=Database.query(totCount);
+             string strRedCount='SELECT Count(Id) rCount from Account where RecordTypeId =: clientRTID AND (Status__c =  \'New Leads\' OR Status__c = \'Recently Added\' OR  Status__c = \'Attempted Contact\' OR Status__c = \'Initial Discovery\') AND Co_Borrower_Customer__c = NULL AND Partner_Referred_ByCon__c=:userFilter AND (Lead_Priority__c= \'Hot\' OR Lead_Priority__c= \'Flaming Hot\') ';
+             AggregateResult redcount=Database.query(strRedCount);
+             string stryellCount='SELECT Count(Id) yCount from Account where RecordTypeId =: clientRTID AND (Status__c =  \'New Leads\' OR Status__c = \'Recently Added\' OR  Status__c = \'Attempted Contact\' OR Status__c = \'Initial Discovery\') AND Co_Borrower_Customer__c = NULL AND Partner_Referred_ByCon__c=:userFilter AND Lead_Priority__c= \'Warm\'';
+             AggregateResult yellCount=Database.query(stryellCount);
+             string strgreenCount='SELECT Count(Id) gCount from Account where RecordTypeId =: clientRTID AND (Status__c =  \'New Leads\' OR Status__c = \'Recently Added\' OR  Status__c = \'Attempted Contact\' OR Status__c = \'Initial Discovery\') AND Co_Borrower_Customer__c = NULL AND Partner_Referred_ByCon__c=:userFilter AND (Lead_Priority__c= \'Cold\' OR Lead_Priority__c= \'\') ';
+             AggregateResult greenCount=Database.query(strgreenCount);
+             objChart.y = (Integer)totalcount.get('tCount');
+             objChart.red = String.valueOf((Integer)redcount.get('rCount'));
+             objChart.yellow = String.valueOf((Integer)yellCount.get('yCount'));
+             objChart.green = String.valueOf((Integer)greenCount.get('gCount'));
+             
+             objChart.label = 'Leads';
+             objChart.accList = finalaccList;
+
+             return objChart;
+            }else{
+                String accQuery = 'SELECT Id, Loan_Type__c, CustomerPriority__c, AccountSource, Client_Referred_By__c, Partner_Referred_ByCon__c, Referred_By__c, Type, FirstName, LastName, Status__c, Last_Activity_Date__c,inflooens__Lead_Priority__c FROM Account where RecordTypeId =: clientRTID AND (Status__c =  \'New Leads\' OR Status__c = \'Recently Added\' OR  Status__c = \'Attempted Contact\' OR Status__c = \'Initial Discovery\') AND Co_Borrower_Customer__c = NULL AND OwnerId=:requiredUsersId ' ;
+        
+             if(SortBy=='ASC'||SortBy=='DESC'){
+                accQuery += ' WITH SECURITY_ENFORCED ORDER BY '+SortColumnName+' ' +SortBy+'  LIMIT :recordToDisply OFFSET :offset'; 
+             }
+             else{
+                accQuery +=' WITH SECURITY_ENFORCED LIMIT :recordToDisply OFFSET :offset';
+             }
+             // finalaccList = Database.query(accQuery);
+             
+
+              //search str
+              if (!String.isBlank(schStr)) {   
+
+                    String fields = 'Loan_Type__c, inflooens__CustomerPriority__c, AccountSource, Client_Referred_By__c, Partner_Referred_ByCon__c, inflooens__Referred_By__c, Type, FirstName, LastName, Status__c, Last_Activity_Date__c,inflooens__Lead_Priority__c';
+                    Map<String, String> objectFieldMap = new Map<String, String>{'Account'=> fields};
+                    Map<String, String> accountMap = new Map<String, String>{'Account'=> ' WHERE (Status__c = \'New Leads\' OR Status__c = \'Recently Added\') AND Co_Borrower_Customer__c = NULL'};
+                    Map<String, List<sObject>> accountResultMap = SOSLGenericController.soslReturn(schStr, objectFieldMap, accountMap); 
+                    finalaccList.addAll((List<Account>)accountResultMap.get('Account'));
+                    CountList = finalaccList.clone();
+
+              }else{
+                    finalaccList = Database.query(accQuery);
+
+              }
+              system.debug('LIST IN NEWLEADS###');
+
+              
+             ChartDetails objChart = new ChartDetails();
+             //objChart.y = Database.query(strQueryTotal).size();
+            
+             string totCount='SELECT Count(Id) tCount from Account where RecordTypeId =: clientRTID AND (Status__c =  \'New Leads\' OR Status__c = \'Recently Added\' OR  Status__c = \'Attempted Contact\' OR Status__c = \'Initial Discovery\') AND Co_Borrower_Customer__c = NULL AND OwnerId=:requiredUsersId ';
+             AggregateResult totalcount=Database.query(totCount);
+             string strRedCount='SELECT Count(Id) rCount from Account where RecordTypeId =: clientRTID AND (Status__c =  \'New Leads\' OR Status__c = \'Recently Added\' OR  Status__c = \'Attempted Contact\' OR Status__c = \'Initial Discovery\') AND Co_Borrower_Customer__c = NULL AND OwnerId=:requiredUsersId AND (Lead_Priority__c= \'Hot\' OR Lead_Priority__c= \'Flaming Hot\') ';
+             AggregateResult redcount=Database.query(strRedCount);
+             string stryellCount='SELECT Count(Id) yCount from Account where RecordTypeId =: clientRTID AND (Status__c =  \'New Leads\' OR Status__c = \'Recently Added\' OR  Status__c = \'Attempted Contact\' OR Status__c = \'Initial Discovery\') AND Co_Borrower_Customer__c = NULL AND OwnerId=:requiredUsersId AND Lead_Priority__c= \'Warm\'';
+             AggregateResult yellCount=Database.query(stryellCount);
+             string strgreenCount='SELECT Count(Id) gCount from Account where RecordTypeId =: clientRTID AND (Status__c =  \'New Leads\' OR Status__c = \'Recently Added\' OR  Status__c = \'Attempted Contact\' OR Status__c = \'Initial Discovery\') AND Co_Borrower_Customer__c = NULL AND OwnerId=:requiredUsersId AND (Lead_Priority__c= \'Cold\' OR Lead_Priority__c= \'\') ';
+             AggregateResult greenCount=Database.query(strgreenCount);
+             objChart.y = (Integer)totalcount.get('tCount');
+             objChart.red = String.valueOf((Integer)redcount.get('rCount'));
+             objChart.yellow = String.valueOf((Integer)yellCount.get('yCount'));
+             objChart.green = String.valueOf((Integer)greenCount.get('gCount'));
+             
+             objChart.label = 'Leads';
+             objChart.accList = finalaccList;
+
+             return objChart;
+            }
+        } 
+        // BM starts to Add Nurture Status in Funnel chart
+
+
+        else  if(strStatus=='Nurture'){
+            List<Account> finalNurtureList = new List<Account>();
+            List<Account> nurtcntlst = new List<Account>();
+            Integer NurtureRed = 0;
+            Integer NurtureGreen = 0;
+            Integer NurtureYellow = 0;
+           if( userFilter != NULL && String.valueOf(userFilter).startsWith('003')){
+            String nurturQuery = 'SELECT Id, Loan_Type__c, CustomerPriority__c, AccountSource, Client_Referred_By__c, Partner_Referred_ByCon__c, Referred_By__c, Type, FirstName, LastName, Status__c,inflooens__Lead_Priority__c, Last_Activity_Date__c FROM Account where RecordTypeId =: clientRTID AND (Status__c =  \'Nurture\') AND Co_Borrower_Customer__c = NULL AND Partner_Referred_ByCon__c=:userFilter ';
+        
+            //String strQueryTotal = nurturQuery + ' WITH SECURITY_ENFORCED limit 49900';
+        
+            System.debug('##schStr##'+schStr);
+        
+            if(SortBy=='ASC'||SortBy=='DESC'){
+            nurturQuery += ' WITH SECURITY_ENFORCED ORDER BY '+SortColumnName+' ' +SortBy+'  LIMIT :recordToDisply OFFSET :offset'; 
+            }
+            else{
+            nurturQuery +=' WITH SECURITY_ENFORCED LIMIT :recordToDisply OFFSET :offset';
+            }
+            
+        
+            //search str
+            if (!String.isBlank(schStr)) {   
+        
+                String fields = 'Loan_Type__c, inflooens__CustomerPriority__c, AccountSource, Client_Referred_By__c, Partner_Referred_ByCon__c, inflooens__Referred_By__c, Type, FirstName, LastName, Status__c, Last_Activity_Date__c,inflooens__Lead_Priority__c';
+                Map<String, String> objectFieldMap = new Map<String, String>{'Account'=> fields};
+                Map<String, String> accountMap = new Map<String, String>{'Account'=> ' WHERE (Status__c = \'Nurture\') AND Co_Borrower_Customer__c = NULL'};
+                Map<String, List<sObject>> accountResultMap = SOSLGenericController.soslReturn(schStr, objectFieldMap, accountMap); 
+                finalNurtureList.addAll((List<Account>)accountResultMap.get('Account'));
+                nurtcntlst = finalNurtureList.clone();
+        
+            }else{
+            finalNurtureList = Database.query(nurturQuery);
+            //nurtcntlst = Database.query(strQueryTotal);
+        
+        
+            }
+            system.debug('LIST IN Nurture###');
+        
+            for(Account NurtureObj : nurtcntlst){
+                if(NurtureObj.inflooens__Lead_Priority__c=='Hot' || NurtureObj.inflooens__Lead_Priority__c=='Flaming Hot'){
+                    NurtureRed+=1; 
+                }
+                else  if (NurtureObj.inflooens__Lead_Priority__c=='Warm'){
+                    NurtureYellow+=1; 
+                }
+                else{
+                    NurtureGreen+=1; 
+                }
+            }
+            ChartDetails objChart3 = new ChartDetails();
+             string totCount='SELECT Count(Id) tCount from Account where RecordTypeId =: clientRTID AND (Status__c = \'Nurture\') AND Co_Borrower_Customer__c = NULL AND Partner_Referred_ByCon__c=:userFilter ';
+             AggregateResult totalcount=Database.query(totCount);
+             string strRedCount='SELECT Count(Id) rCount from Account where RecordTypeId =: clientRTID AND (Status__c = \'Nurture\') AND Co_Borrower_Customer__c = NULL AND Partner_Referred_ByCon__c=:userFilter AND (Lead_Priority__c= \'Hot\' OR Lead_Priority__c= \'Flaming Hot\') ';
+             AggregateResult redcount=Database.query(strRedCount);
+             string stryellCount='SELECT Count(Id) yCount from Account where RecordTypeId =: clientRTID AND (Status__c = \'Nurture\') AND Co_Borrower_Customer__c = NULL AND Partner_Referred_ByCon__c=:userFilter AND Lead_Priority__c= \'Warm\'';
+             AggregateResult yellCount=Database.query(stryellCount);
+             string strgreenCount='SELECT Count(Id) gCount from Account where RecordTypeId =: clientRTID AND (Status__c = \'Nurture\') AND Co_Borrower_Customer__c = NULL AND Partner_Referred_ByCon__c=:userFilter AND (Lead_Priority__c= \'Cold\' OR Lead_Priority__c= \'\') ';
+             AggregateResult greenCount=Database.query(strgreenCount);
+            
+             objChart3.y = (Integer)totalcount.get('tCount');
+             objChart3.red = String.valueOf((Integer)redcount.get('rCount'));
+             objChart3.yellow = String.valueOf((Integer)yellCount.get('yCount'));
+             objChart3.green = String.valueOf((Integer)greenCount.get('gCount'));
+            //objChart3.y = Database.query(strQueryTotal).size();
+            //objChart3.y = nurtcntlst.size(); 
+            
+            objChart3.label = 'Nurture';
+            objChart3.accList = finalNurtureList;
+           // objChart3.red = String.valueOf(NurtureRed);
+           // objChart3.green = String.valueOf(NurtureGreen);
+           // objChart3.yellow = String.valueOf(NurtureYellow);
+            return objChart3;
+            }else{
+                String nurturQuery = 'SELECT Id, Loan_Type__c, CustomerPriority__c, AccountSource, Client_Referred_By__c, Partner_Referred_ByCon__c, Referred_By__c, Type, FirstName, LastName, Status__c,inflooens__Lead_Priority__c, Last_Activity_Date__c FROM Account where RecordTypeId =: clientRTID AND (Status__c =  \'Nurture\') AND Co_Borrower_Customer__c = NULL';
+        
+            //String strQueryTotal = nurturQuery + ' WITH SECURITY_ENFORCED limit 49900';
+        
+            System.debug('##schStr##'+schStr);
+        
+            if(SortBy=='ASC'||SortBy=='DESC'){
+            nurturQuery += ' WITH SECURITY_ENFORCED ORDER BY '+SortColumnName+' ' +SortBy+'  LIMIT :recordToDisply OFFSET :offset'; 
+            }
+            else{
+            nurturQuery +=' WITH SECURITY_ENFORCED LIMIT :recordToDisply OFFSET :offset';
+            }
+            
+        
+            //search str
+            if (!String.isBlank(schStr)) {   
+        
+                String fields = 'Loan_Type__c, inflooens__CustomerPriority__c, AccountSource, Client_Referred_By__c, Partner_Referred_ByCon__c, inflooens__Referred_By__c, Type, FirstName, LastName, Status__c, Last_Activity_Date__c,inflooens__Lead_Priority__c';
+                Map<String, String> objectFieldMap = new Map<String, String>{'Account'=> fields};
+                Map<String, String> accountMap = new Map<String, String>{'Account'=> ' WHERE (Status__c = \'Nurture\') AND Co_Borrower_Customer__c = NULL'};
+                Map<String, List<sObject>> accountResultMap = SOSLGenericController.soslReturn(schStr, objectFieldMap, accountMap); 
+                finalNurtureList.addAll((List<Account>)accountResultMap.get('Account'));
+                nurtcntlst = finalNurtureList.clone();
+        
+            }else{
+            finalNurtureList = Database.query(nurturQuery);
+            //nurtcntlst = Database.query(strQueryTotal);
+        
+        
+            }
+            system.debug('LIST IN Nurture###');
+        
+            for(Account NurtureObj : nurtcntlst){
+                if(NurtureObj.inflooens__Lead_Priority__c=='Hot' || NurtureObj.inflooens__Lead_Priority__c=='Flaming Hot'){
+                    NurtureRed+=1; 
+                }
+                else  if (NurtureObj.inflooens__Lead_Priority__c=='Warm'){
+                    NurtureYellow+=1; 
+                }
+                else{
+                    NurtureGreen+=1; 
+                }
+            }
+            ChartDetails objChart3 = new ChartDetails();
+             string totCount='SELECT Count(Id) tCount from Account where RecordTypeId =: clientRTID AND (Status__c = \'Nurture\') AND Co_Borrower_Customer__c = NULL AND OwnerId=:requiredUsersId ';
+             AggregateResult totalcount=Database.query(totCount);
+             string strRedCount='SELECT Count(Id) rCount from Account where RecordTypeId =: clientRTID AND (Status__c = \'Nurture\') AND Co_Borrower_Customer__c = NULL AND OwnerId=:requiredUsersId AND (Lead_Priority__c= \'Hot\' OR Lead_Priority__c= \'Flaming Hot\') ';
+             AggregateResult redcount=Database.query(strRedCount);
+             string stryellCount='SELECT Count(Id) yCount from Account where RecordTypeId =: clientRTID AND (Status__c = \'Nurture\') AND Co_Borrower_Customer__c = NULL AND OwnerId=:requiredUsersId AND Lead_Priority__c= \'Warm\'';
+             AggregateResult yellCount=Database.query(stryellCount);
+             string strgreenCount='SELECT Count(Id) gCount from Account where RecordTypeId =: clientRTID AND (Status__c = \'Nurture\') AND Co_Borrower_Customer__c = NULL AND OwnerId=:requiredUsersId AND (Lead_Priority__c= \'Cold\' OR Lead_Priority__c= \'\') ';
+             AggregateResult greenCount=Database.query(strgreenCount);
+            
+             objChart3.y = (Integer)totalcount.get('tCount');
+             objChart3.red = String.valueOf((Integer)redcount.get('rCount'));
+             objChart3.yellow = String.valueOf((Integer)yellCount.get('yCount'));
+             objChart3.green = String.valueOf((Integer)greenCount.get('gCount'));
+            //objChart3.y = Database.query(strQueryTotal).size();
+            //objChart3.y = nurtcntlst.size(); 
+            
+            objChart3.label = 'Nurture';
+            objChart3.accList = finalNurtureList;
+           // objChart3.red = String.valueOf(NurtureRed);
+           // objChart3.green = String.valueOf(NurtureGreen);
+           // objChart3.yellow = String.valueOf(NurtureYellow);
+            return objChart3;
+            }
+        } 
+        
+        //  ends of Nurture 
+        else if(strStatus=='Pre-Qualified'){ 
+             List<Account> preApproveProList = new List<Account>();
+             if( userFilter != NULL && String.valueOf(userFilter).startsWith('003')){
+             String preApprovalProQuery = 'SELECT Id, Pre_Approval_Process_Date__c, CustomerPriority__c, (SELECT Status__c FROM Documents__r), Loan_Type__c, AccountSource, Client_Referred_By__c, Partner_Referred_ByCon__c, Referred_By__c, Type, FirstName, LastName, Status__c, Last_Activity_Date__c,Sic FROM Account WHERE RecordTypeId =: clientRTID AND Status__c = \'Pre-Qualified\' AND Co_Borrower_Customer__c = NULL AND Partner_Referred_ByCon__c=:userFilter ';
+            // preApprovalProQuery +=' WITH SECURITY_ENFORCED';
+            // String strQueryTotal = preApprovalProQuery + ' WITH SECURITY_ENFORCED Limit 49900'; commented at large data issue june 2023
+            if(SortBy=='ASC'||SortBy=='DESC'){
+                preApprovalProQuery += ' WITH SECURITY_ENFORCED ORDER BY '+SortColumnName+' ' +SortBy+'  LIMIT :recordToDisply OFFSET :offset'; 
+             }
+             else{
+                preApprovalProQuery +=' WITH SECURITY_ENFORCED LIMIT :recordToDisply OFFSET :offset';
+             }
+             //preApproveProList = Database.query(preApprovalProQuery); 
+           
+
+        //search str
+        if (!String.isBlank(schStr)) {   
+
+            String fields = 'Id,Pre_Approval_Process_Date__c,Loan_Type__c, inflooens__CustomerPriority__c, AccountSource, Client_Referred_By__c, Partner_Referred_ByCon__c, inflooens__Referred_By__c, Type, FirstName, LastName, Status__c, Last_Activity_Date__c,inflooens__Lead_Priority__c,Sic';
+            Map<String, String> objectFieldMap = new Map<String, String>{'Account'=> fields};
+            Map<String, String> accountMap = new Map<String, String>{'Account'=> ' WHERE (Status__c = \'Pre-Qualified\' ) AND Co_Borrower_Customer__c = NULL'};
+            Map<String, List<sObject>> accountResultMap = SOSLGenericController.soslReturn(schStr, objectFieldMap, accountMap); 
+            preApproveProList.addAll((List<Account>)accountResultMap.get('Account'));
+           
+
+        }else{
+          
+            preApproveProList = Database.query(preApprovalProQuery); 
+
+        }
+
+        system.debug('LIST IN PRE-APPROVAINPROCESS###');
+
+
+             Integer totalApprovalProcess = 0; 
+             totalApprovalProcess = preApproveProList.size();
+        
+            List<Set_Up__c> preProList = new List<Set_Up__c>();
+            List<Set_Up__c> preAppList = new List<Set_Up__c>();
+            
+            preProList = [SELECT At_Risk_In_days__c, Requires_Attention_days__c FROM Set_Up__c
+                          WHERE Type__c = 'Client' AND Subtype__c = 'Pre-Qualified' AND Active__c = TRUE];
+            
+            Integer preProRed = 0;
+            Integer preProGreen = 0;
+            Integer preProYellow = 0;
+            
+            for(Account preAppPro : preApproveProList){
+                
+                Integer requestedDocs = 0;
+                Integer reviewDocs = 0;
+                Integer rejectedDocs = 0;
+                Integer acceptedDocs = 0;
+                
+                
+                for(Document__c doc : preAppPro.Documents__r){
+                    
+                    if(doc.Status__c == 'Requested'){
+                        
+                        requestedDocs += 1;
+                    }
+                    if(doc.Status__c == 'Review Pending'){
+                        
+                        reviewDocs += 1;
+                    }
+                    if(doc.Status__c == 'Accepted'){
+                        
+                        acceptedDocs += 1;
+                    }
+                    if(doc.Status__c == 'Rejected'){
+                        
+                        rejectedDocs += 1;
+                    }
+                }
+                
+                if(preProList.size() > 0){
+                    if(preProList.get(0).At_Risk_In_days__c != NULL && preAppPro.Pre_Approval_Process_Date__c != NULL && System.Today() >= preAppPro.Pre_Approval_Process_Date__c.addDays(Integer.valueOf(preProList.get(0).At_Risk_In_days__c))){
+                        preProRed += 1;
+                        preAppPro.Sic = 'Red';
+                    }
+                    else if(preProList.get(0).Requires_Attention_days__c != NULL && preAppPro.Pre_Approval_Process_Date__c != NULL && System.Today() >= preAppPro.Pre_Approval_Process_Date__c.addDays(Integer.valueOf(preProList.get(0).Requires_Attention_days__c))){
+                        preProYellow += 1;
+                        preAppPro.Sic = 'Yellow';
+                    }
+                    else{
+                        preProGreen += 1;
+                        preAppPro.Sic = 'Green';
+                    }
+                }
+                preAppPro.Requested_Docs__c = requestedDocs;
+                preAppPro.Review_Pending_Docs__c = reviewDocs;
+                preAppPro.Rejected_Docs__c = rejectedDocs;
+                preAppPro.Accepted_Docs__c = acceptedDocs;
+            }
+            string preApprovaltotal='SELECT Count(Id) tCount FROM Account WHERE RecordTypeId =: clientRTID AND Status__c = \'Pre-Qualified\' AND Co_Borrower_Customer__c = NULL AND Partner_Referred_ByCon__c=:userFilter WITH SECURITY_ENFORCED ';
+            AggregateResult pretotalcount=Database.query(preApprovaltotal);
+           // update preApproveProList;
+            ChartDetails objChart1 = new ChartDetails();
+            objChart1.y = (Integer)pretotalcount.get('tCount');
+            objChart1.label = 'Pre-Qualified';
+            objChart1.accList = preApproveProList;
+            objChart1.red = String.valueOf(preProRed);
+            objChart1.green = String.valueOf(preProGreen);
+            objChart1.yellow = String.valueOf(preProYellow);
+            return objChart1;
+             }else{
+                  String preApprovalProQuery = 'SELECT Id, Pre_Approval_Process_Date__c, CustomerPriority__c, (SELECT Status__c FROM Documents__r), Loan_Type__c, AccountSource, Client_Referred_By__c, Partner_Referred_ByCon__c, Referred_By__c, Type, FirstName, LastName, Status__c, Last_Activity_Date__c,Sic FROM Account WHERE RecordTypeId =: clientRTID AND Status__c = \'Pre-Qualified\' AND Co_Borrower_Customer__c = NULL AND OwnerId=:requiredUsersId ';
+            // preApprovalProQuery +=' WITH SECURITY_ENFORCED';
+            // String strQueryTotal = preApprovalProQuery + ' WITH SECURITY_ENFORCED Limit 49900'; commented at large data issue june 2023
+            if(SortBy=='ASC'||SortBy=='DESC'){
+                preApprovalProQuery += ' WITH SECURITY_ENFORCED ORDER BY '+SortColumnName+' ' +SortBy+'  LIMIT :recordToDisply OFFSET :offset'; 
+             }
+             else{
+                preApprovalProQuery +=' WITH SECURITY_ENFORCED LIMIT :recordToDisply OFFSET :offset';
+             }
+             //preApproveProList = Database.query(preApprovalProQuery); 
+           
+
+        //search str
+        if (!String.isBlank(schStr)) {   
+
+            String fields = 'Id,Pre_Approval_Process_Date__c,Loan_Type__c, inflooens__CustomerPriority__c, AccountSource, Client_Referred_By__c, Partner_Referred_ByCon__c, inflooens__Referred_By__c, Type, FirstName, LastName, Status__c, Last_Activity_Date__c,inflooens__Lead_Priority__c,Sic';
+            Map<String, String> objectFieldMap = new Map<String, String>{'Account'=> fields};
+            Map<String, String> accountMap = new Map<String, String>{'Account'=> ' WHERE (Status__c = \'Pre-Qualified\' ) AND Co_Borrower_Customer__c = NULL'};
+            Map<String, List<sObject>> accountResultMap = SOSLGenericController.soslReturn(schStr, objectFieldMap, accountMap); 
+            preApproveProList.addAll((List<Account>)accountResultMap.get('Account'));
+           
+
+        }else{
+          
+            preApproveProList = Database.query(preApprovalProQuery); 
+
+        }
+
+        system.debug('LIST IN PRE-APPROVAINPROCESS###');
+
+
+             Integer totalApprovalProcess = 0; 
+             totalApprovalProcess = preApproveProList.size();
+        
+            List<Set_Up__c> preProList = new List<Set_Up__c>();
+            List<Set_Up__c> preAppList = new List<Set_Up__c>();
+            
+            preProList = [SELECT At_Risk_In_days__c, Requires_Attention_days__c FROM Set_Up__c
+                          WHERE Type__c = 'Client' AND Subtype__c = 'Pre-Qualified' AND Active__c = TRUE];
+            
+            Integer preProRed = 0;
+            Integer preProGreen = 0;
+            Integer preProYellow = 0;
+            
+            for(Account preAppPro : preApproveProList){
+                
+                Integer requestedDocs = 0;
+                Integer reviewDocs = 0;
+                Integer rejectedDocs = 0;
+                Integer acceptedDocs = 0;
+                
+                
+                for(Document__c doc : preAppPro.Documents__r){
+                    
+                    if(doc.Status__c == 'Requested'){
+                        
+                        requestedDocs += 1;
+                    }
+                    if(doc.Status__c == 'Review Pending'){
+                        
+                        reviewDocs += 1;
+                    }
+                    if(doc.Status__c == 'Accepted'){
+                        
+                        acceptedDocs += 1;
+                    }
+                    if(doc.Status__c == 'Rejected'){
+                        
+                        rejectedDocs += 1;
+                    }
+                }
+                
+                if(preProList.size() > 0){
+                    if(preProList.get(0).At_Risk_In_days__c != NULL && preAppPro.Pre_Approval_Process_Date__c != NULL && System.Today() >= preAppPro.Pre_Approval_Process_Date__c.addDays(Integer.valueOf(preProList.get(0).At_Risk_In_days__c))){
+                        preProRed += 1;
+                        preAppPro.Sic = 'Red';
+                    }
+                    else if(preProList.get(0).Requires_Attention_days__c != NULL && preAppPro.Pre_Approval_Process_Date__c != NULL && System.Today() >= preAppPro.Pre_Approval_Process_Date__c.addDays(Integer.valueOf(preProList.get(0).Requires_Attention_days__c))){
+                        preProYellow += 1;
+                        preAppPro.Sic = 'Yellow';
+                    }
+                    else{
+                        preProGreen += 1;
+                        preAppPro.Sic = 'Green';
+                    }
+                }
+                preAppPro.Requested_Docs__c = requestedDocs;
+                preAppPro.Review_Pending_Docs__c = reviewDocs;
+                preAppPro.Rejected_Docs__c = rejectedDocs;
+                preAppPro.Accepted_Docs__c = acceptedDocs;
+            }
+            string preApprovaltotal='SELECT Count(Id) tCount FROM Account WHERE RecordTypeId =: clientRTID AND Status__c = \'Pre-Qualified\' AND Co_Borrower_Customer__c = NULL AND OwnerId=:requiredUsersId WITH SECURITY_ENFORCED ';
+            AggregateResult pretotalcount=Database.query(preApprovaltotal);
+           // update preApproveProList;
+            ChartDetails objChart1 = new ChartDetails();
+            objChart1.y = (Integer)pretotalcount.get('tCount');
+            objChart1.label = 'Pre-Qualified';
+            objChart1.accList = preApproveProList;
+            objChart1.red = String.valueOf(preProRed);
+            objChart1.green = String.valueOf(preProGreen);
+            objChart1.yellow = String.valueOf(preProYellow);
+            return objChart1;
+             }
+        }
+        else{
+            List<Account> preApprovedList = new List<Account>();
+            Integer totalPreApproved = 0;
+            if( userFilter != NULL && String.valueOf(userFilter).startsWith('003')){
+            String preApprovedQuery = 'SELECT Id, Pre_Approved_Date__c, CustomerPriority__c, ExpirationDate__c, Loan_Amount__c, Loan_Type__c, AccountSource, Client_Referred_By__c, Partner_Referred_ByCon__c,  Referred_By__c, Type, FirstName, LastName, Status__c, Last_Activity_Date__c,Sic FROM Account WHERE RecordTypeId =: clientRTID AND Status__c = \'Pre-Approved\' AND Co_Borrower_Customer__c = NULL AND Partner_Referred_ByCon__c=:userFilter ';
+            String strQueryTotal = preApprovedQuery + ' WITH SECURITY_ENFORCED Limit 49900';
+            if(SortBy=='ASC'||SortBy=='DESC'){
+                preApprovedQuery += ' WITH SECURITY_ENFORCED ORDER BY '+SortColumnName+' ' +SortBy+'  LIMIT :recordToDisply OFFSET :offset'; 
+             }
+             else{
+                preApprovedQuery +=' WITH SECURITY_ENFORCED LIMIT :recordToDisply OFFSET :offset';
+             }
+          //  preApprovedList = Database.query(preApprovedQuery); 
+
+           system.debug('LIST IN ELSE###');
+        //search str
+        if (!String.isBlank(schStr)) {   
+            
+            String fields = 'Id, Pre_Approved_Date__c, CustomerPriority__c, ExpirationDate__c, Loan_Amount__c, Loan_Type__c, AccountSource, Client_Referred_By__c, Partner_Referred_ByCon__c,  Referred_By__c, Type, FirstName, LastName, Status__c, Last_Activity_Date__c,Sic';
+            Map<String, String> objectFieldMap = new Map<String, String>{'Account'=> fields};
+            Map<String, String> accountMap = new Map<String, String>{'Account'=> ' WHERE (Status__c = \'Pre-Approved\' ) AND Co_Borrower_Customer__c = NULL'};
+            Map<String, List<sObject>> accountResultMap = SOSLGenericController.soslReturn(schStr, objectFieldMap, accountMap); 
+            preApprovedList.addAll((List<Account>)accountResultMap.get('Account'));
+            system.debug('LIST IN SEARCH###');
+
+        }else{
+        
+            preApprovedList = Database.query(preApprovedQuery); 
+
+        }
+
+       
+            totalPreApproved = preApprovedList.size();
+            List<Set_Up__c> preAppList = new List<Set_Up__c>();
+            preAppList = [SELECT At_Risk_In_days__c, Requires_Attention_days__c FROM Set_Up__c
+                          WHERE Type__c = 'Client' AND Subtype__c = 'Pre Approved' AND Active__c = TRUE];
+            
+            Integer appRed = 0;
+            Integer appGreen = 0;
+            Integer appYellow = 0;
+            for(Account preApproved : preApprovedList){
+                
+                if(preAppList.size() > 0){
+                    if(preAppList.get(0).At_Risk_In_days__c != NULL && preApproved.Pre_Approved_Date__c != NULL && System.Today() >= preApproved.Pre_Approved_Date__c.addDays(Integer.valueOf(preAppList.get(0).At_Risk_In_days__c))){
+                        appRed += 1;
+                        preApproved.Sic = 'Red';
+                    }
+                    else if(preAppList.get(0).Requires_Attention_days__c != NULL && preApproved.Pre_Approved_Date__c != NULL && System.Today() >= preApproved.Pre_Approved_Date__c.addDays(Integer.valueOf(preAppList.get(0).Requires_Attention_days__c))){
+                        appYellow += 1;
+                        preApproved.Sic = 'Yellow';
+                    }
+                    else{
+                        appGreen += 1;
+                        preApproved.Sic = 'Green';
+                    }
+                }
+            }
+            ChartDetails objChart2 = new ChartDetails();
+            objChart2.y = Database.query(strQueryTotal).size();
+            objChart2.label = 'Pre-approved';
+            objChart2.accList = preApprovedList;
+            objChart2.red = String.valueOf(appRed);
+            objChart2.green = String.valueOf(appGreen);
+            objChart2.yellow = String.valueOf(appYellow);
+            return objChart2;
+             }
+            else{
+             String preApprovedQuery = 'SELECT Id, Pre_Approved_Date__c, CustomerPriority__c, ExpirationDate__c, Loan_Amount__c, Loan_Type__c, AccountSource, Client_Referred_By__c, Partner_Referred_ByCon__c,  Referred_By__c, Type, FirstName, LastName, Status__c, Last_Activity_Date__c,Sic FROM Account WHERE RecordTypeId =: clientRTID AND Status__c = \'Pre-Approved\' AND Co_Borrower_Customer__c = NULL AND OwnerId=:requiredUsersId ';
+            String strQueryTotal = preApprovedQuery + ' WITH SECURITY_ENFORCED Limit 49900';
+            if(SortBy=='ASC'||SortBy=='DESC'){
+                preApprovedQuery += ' WITH SECURITY_ENFORCED ORDER BY '+SortColumnName+' ' +SortBy+'  LIMIT :recordToDisply OFFSET :offset'; 
+             }
+             else{
+                preApprovedQuery +=' WITH SECURITY_ENFORCED LIMIT :recordToDisply OFFSET :offset';
+             }
+          //  preApprovedList = Database.query(preApprovedQuery); 
+
+           system.debug('LIST IN ELSE###');
+        //search str
+        if (!String.isBlank(schStr)) {   
+            
+            String fields = 'Id, Pre_Approved_Date__c, CustomerPriority__c, ExpirationDate__c, Loan_Amount__c, Loan_Type__c, AccountSource, Client_Referred_By__c, Partner_Referred_ByCon__c,  Referred_By__c, Type, FirstName, LastName, Status__c, Last_Activity_Date__c,Sic';
+            Map<String, String> objectFieldMap = new Map<String, String>{'Account'=> fields};
+            Map<String, String> accountMap = new Map<String, String>{'Account'=> ' WHERE (Status__c = \'Pre-Approved\' ) AND Co_Borrower_Customer__c = NULL'};
+            Map<String, List<sObject>> accountResultMap = SOSLGenericController.soslReturn(schStr, objectFieldMap, accountMap); 
+            preApprovedList.addAll((List<Account>)accountResultMap.get('Account'));
+            system.debug('LIST IN SEARCH###');
+
+        }else{
+        
+            preApprovedList = Database.query(preApprovedQuery); 
+
+        }
+
+       
+            totalPreApproved = preApprovedList.size();
+            List<Set_Up__c> preAppList = new List<Set_Up__c>();
+            preAppList = [SELECT At_Risk_In_days__c, Requires_Attention_days__c FROM Set_Up__c
+                          WHERE Type__c = 'Client' AND Subtype__c = 'Pre Approved' AND Active__c = TRUE];
+            
+            Integer appRed = 0;
+            Integer appGreen = 0;
+            Integer appYellow = 0;
+            for(Account preApproved : preApprovedList){
+                
+                if(preAppList.size() > 0){
+                    if(preAppList.get(0).At_Risk_In_days__c != NULL && preApproved.Pre_Approved_Date__c != NULL && System.Today() >= preApproved.Pre_Approved_Date__c.addDays(Integer.valueOf(preAppList.get(0).At_Risk_In_days__c))){
+                        appRed += 1;
+                        preApproved.Sic = 'Red';
+                    }
+                    else if(preAppList.get(0).Requires_Attention_days__c != NULL && preApproved.Pre_Approved_Date__c != NULL && System.Today() >= preApproved.Pre_Approved_Date__c.addDays(Integer.valueOf(preAppList.get(0).Requires_Attention_days__c))){
+                        appYellow += 1;
+                        preApproved.Sic = 'Yellow';
+                    }
+                    else{
+                        appGreen += 1;
+                        preApproved.Sic = 'Green';
+                    }
+                }
+            }
+            ChartDetails objChart2 = new ChartDetails();
+            objChart2.y = Database.query(strQueryTotal).size();
+            objChart2.label = 'Pre-approved';
+            objChart2.accList = preApprovedList;
+            objChart2.red = String.valueOf(appRed);
+            objChart2.green = String.valueOf(appGreen);
+            objChart2.yellow = String.valueOf(appYellow);
+            return objChart2;
+             }
+        }
+    }
+    @AuraEnabled
+    public static List<ChartDetails> extractChartData(String objectName, String duration,String userFilter){
+         //String userFilter='hcbhuwuhcbhw';
+         //data filter code by shubham=========
+         system.debug('userFilter------>'+userFilter);
+         List < User > requiredUsers = new List < user > ();
+
+        Set < id > requiredUsersId = new Set < id > ();
+        AggregateResult[] results;
+        results = [select SUM(Original_Loan_Amount__c) from inflooens__Loan__c where inflooens__Borrower_Name__r.inflooens__Partner_Referred_ByCon__c=:userFilter ];
+         boolean pipelinefunnel;
+        if (userFilter.containsIgnoreCase('My Team')) {
+            requiredUsers = InfloHomePageController.NewgetUsersUnder(UserInfo.getUserId(), String.valueOf(Date.Today().Year()));
+            for (User u: requiredUsers) {
+                requiredUsersId.add(u.id);
+            }
+        } else if (userFilter.containsIgnoreCase('My Company') || userFilter.containsIgnoreCase('All')) {
+            for (user u: [Select id from User WHERE IsActive = TRUE AND AccountId = NULL WITH SECURITY_ENFORCED LIMIT 40000]) {
+                requiredUsersId.add(u.id);
+            }
+        } else {
+            requiredUsersId.add(UserInfo.getUserId());
+        }
+        //================data filter=================
+        List<ChartDetails> lstChart = new List<ChartDetails>();
+        List<ChartDetails> lstChart1 = new List<ChartDetails>();
+        List<ChartDetails> lstChart3 = new List<ChartDetails>();
+        system.debug('**Duration='+ duration);
+        Integer totalLeads = 0;
+        Integer totalApprovalProcess = 0;
+        Integer totalPreApproved = 0;
+        Integer totalNurtureClients = 0;
+        Integer dur = 365;
+        Boolean accountquery = false;
+        List<String> stageList = new List<String>();
+        Id clientRTID = Schema.SObjectType.Account.getRecordTypeInfosByName().get('Client').getRecordTypeId();
+         system.debug('clientRTID'+clientRTID);
+        List<Contact> contactid = new List<Contact>();
+        contactid = [select id from Contact];
+        system.debug('contactid'+contactid);
+        List<Account> finalaccList = new List<Account>();
+        List<Account> preApproveProList = new List<Account>();
+        List<Account> preApprovedList = new List<Account>();
+        List<Account> finalNurtureList = new List<Account>();
+        //accList = [SELECT Id, FirstName, LastName, Status__c, Last_Activity_Date__c, (SELECT Id FROM Borrower_Names__r) FROM Account WHERE RecordTypeId =: clientRTID ];
+        
+        List<Set_Up__c> setUpList = new List<Set_Up__c>();
+        setUpList = [SELECT No_of_Days__c, Recently_Added_Days__c
+                     FROM Set_Up__c
+                     WHERE Active__c = TRUE
+                     AND Type__c = 'Client List View' WITH SECURITY_ENFORCED];
+        
+        Integer newClientDays = 0;
+        Integer recAddedClientDays = 0;
+        
+        if(setUpList.size() > 0){
+        
+            newClientDays = Integer.valueOf(setUpList.get(0).No_of_Days__c);
+            recAddedClientDays = Integer.valueOf(setUpList.get(0).Recently_Added_Days__c);
+        }
+                         
+        Date lastNewDays = System.Today() - newClientDays ;
+        Date lastRecAddedDays = System.Today() - recAddedClientDays ;
+        if( userFilter != NULL && String.valueOf(userFilter).startsWith('003')){
+        String accQuery = 'SELECT Id, Loan_Type__c, CustomerPriority__c, AccountSource, Client_Referred_By__c, Partner_Referred_ByCon__c, Referred_By__c, Type, FirstName, LastName, Status__c, Last_Activity_Date__c FROM Account WHERE RecordTypeId =: clientRTID AND (Status__c = \'New Leads\' OR Status__c = \'Attempted Contact\' OR Status__c = \'Initial Discovery\' OR Status__c = \'Recently Added\') AND Co_Borrower_Customer__c = NULL AND Partner_Referred_ByCon__c=:userFilter ';//((CreatedDate >=: lastNewDays AND Last_Activity_Date__c = NULL) OR (CreatedDate >=: lastRecAddedDays AND Last_Activity_Date__c != NULL)
+         system.debug('accQuery11111'+accQuery);
+             if(duration=='THIS_YEAR')
+            accQuery += ' AND CreatedDate = LAST_N_DAYS:365';
+        else if(duration=='THIS_MONTH')
+            accQuery += ' AND CreatedDate = LAST_N_DAYS:30';
+        else if(duration=='THIS_QUARTER')
+            accQuery += ' AND CreatedDate = THIS_QUARTER';
+        else if(duration=='THIS_WEEK')
+            accQuery += ' AND CreatedDate = THIS_WEEK';
+        else if(duration=='NEXT_WEEK')
+            accQuery += ' AND CreatedDate = NEXT_WEEK';
+        else if(duration=='LAST_WEEK')
+            accQuery += ' AND CreatedDate = LAST_WEEK';
+            
+        accQuery +=' WITH SECURITY_ENFORCED Limit 49900';
+        
+        finalaccList = Database.query(accQuery); 
+        totalLeads = finalaccList.size();
+        }else{
+            String accQuery = 'SELECT Id, Loan_Type__c, CustomerPriority__c, AccountSource, Client_Referred_By__c, Partner_Referred_ByCon__c, Referred_By__c, Type, FirstName, LastName, Status__c, Last_Activity_Date__c FROM Account WHERE RecordTypeId =: clientRTID AND (Status__c = \'New Leads\' OR Status__c = \'Attempted Contact\' OR Status__c = \'Initial Discovery\' OR Status__c = \'Recently Added\') AND Co_Borrower_Customer__c = NULL AND OwnerId=:requiredUsersId ';//((CreatedDate >=: lastNewDays AND Last_Activity_Date__c = NULL) OR (CreatedDate >=: lastRecAddedDays AND Last_Activity_Date__c != NULL)
+        system.debug('accQuery-----<'+accQuery);
+        if(duration=='THIS_YEAR')
+            accQuery += ' AND CreatedDate = LAST_N_DAYS:365';
+        else if(duration=='THIS_MONTH')
+            accQuery += ' AND CreatedDate = LAST_N_DAYS:30';
+        else if(duration=='THIS_QUARTER')
+            accQuery += ' AND CreatedDate = THIS_QUARTER';
+        else if(duration=='THIS_WEEK')
+            accQuery += ' AND CreatedDate = THIS_WEEK';
+        else if(duration=='NEXT_WEEK')
+            accQuery += ' AND CreatedDate = NEXT_WEEK';
+        else if(duration=='LAST_WEEK')
+            accQuery += ' AND CreatedDate = LAST_WEEK';
+            
+        accQuery +=' WITH SECURITY_ENFORCED Limit 49900';
+        
+        finalaccList = Database.query(accQuery); 
+        totalLeads = finalaccList.size();
+        }
+       if( userFilter != NULL && String.valueOf(userFilter).startsWith('003')){
+        String preApprovedQuery = 'SELECT Id, Pre_Approved_Date__c, CustomerPriority__c, ExpirationDate__c, Loan_Amount__c, Loan_Type__c, AccountSource, Client_Referred_By__c, Partner_Referred_ByCon__c,  Referred_By__c, Type, FirstName, LastName, Status__c, Last_Activity_Date__c FROM Account WHERE RecordTypeId =: clientRTID AND Status__c = \'Pre-Approved\' AND Co_Borrower_Customer__c = NULL AND Partner_Referred_ByCon__c=:userFilter ';
+        
+        if(duration=='THIS_YEAR')
+            preApprovedQuery += ' AND CreatedDate = LAST_N_DAYS:365';
+        else if(duration=='THIS_MONTH')
+            preApprovedQuery += ' AND CreatedDate = LAST_N_DAYS:30';
+        else if(duration=='THIS_QUARTER')
+            preApprovedQuery += ' AND CreatedDate = THIS_QUARTER';
+        else if(duration=='THIS_WEEK')
+            preApprovedQuery += ' AND CreatedDate = THIS_WEEK';
+        else if(duration=='NEXT_WEEK')
+            preApprovedQuery += ' AND CreatedDate = NEXT_WEEK';
+        else if(duration=='LAST_WEEK')
+            preApprovedQuery += ' AND CreatedDate = LAST_WEEK';
+                
+        preApprovedQuery +=' WITH SECURITY_ENFORCED Limit 49900';
+        preApprovedList = Database.query(preApprovedQuery); 
+        totalPreApproved = preApprovedList.size();
+        }else{
+            String preApprovedQuery = 'SELECT Id, Pre_Approved_Date__c, CustomerPriority__c, ExpirationDate__c, Loan_Amount__c, Loan_Type__c, AccountSource, Client_Referred_By__c, Partner_Referred_ByCon__c,  Referred_By__c, Type, FirstName, LastName, Status__c, Last_Activity_Date__c FROM Account WHERE RecordTypeId =: clientRTID AND Status__c = \'Pre-Approved\' AND Co_Borrower_Customer__c = NULL AND OwnerId=:requiredUsersId ';
+        
+        if(duration=='THIS_YEAR')
+            preApprovedQuery += ' AND CreatedDate = LAST_N_DAYS:365';
+        else if(duration=='THIS_MONTH')
+            preApprovedQuery += ' AND CreatedDate = LAST_N_DAYS:30';
+        else if(duration=='THIS_QUARTER')
+            preApprovedQuery += ' AND CreatedDate = THIS_QUARTER';
+        else if(duration=='THIS_WEEK')
+            preApprovedQuery += ' AND CreatedDate = THIS_WEEK';
+        else if(duration=='NEXT_WEEK')
+            preApprovedQuery += ' AND CreatedDate = NEXT_WEEK';
+        else if(duration=='LAST_WEEK')
+            preApprovedQuery += ' AND CreatedDate = LAST_WEEK';
+                
+        preApprovedQuery +=' WITH SECURITY_ENFORCED Limit 49900';
+        preApprovedList = Database.query(preApprovedQuery); 
+        totalPreApproved = preApprovedList.size();
+        }
+        if( userFilter != NULL && String.valueOf(userFilter).startsWith('003')){
+        String preApprovalProQuery = 'SELECT Id, Pre_Approval_Process_Date__c, CustomerPriority__c, (SELECT Status__c FROM Documents__r), Loan_Type__c, AccountSource, Client_Referred_By__c, Partner_Referred_ByCon__c, Referred_By__c, Type, FirstName, LastName, Status__c, Last_Activity_Date__c FROM Account WHERE RecordTypeId =: clientRTID AND Status__c = \'Pre-Qualified\' AND Co_Borrower_Customer__c = NULL AND Partner_Referred_ByCon__c=:userFilter ';
+        
+        if(duration=='THIS_YEAR')
+            preApprovalProQuery += ' AND CreatedDate = LAST_N_DAYS:365';
+        else if(duration=='THIS_MONTH')
+            preApprovalProQuery += ' AND CreatedDate = LAST_N_DAYS:30';
+        else if(duration=='THIS_QUARTER')
+            preApprovalProQuery += ' AND CreatedDate = THIS_QUARTER';
+        else if(duration=='THIS_WEEK')
+            preApprovalProQuery += ' AND CreatedDate = THIS_WEEK';
+        else if(duration=='NEXT_WEEK')
+            preApprovalProQuery += ' AND CreatedDate = NEXT_WEEK';
+        else if(duration=='LAST_WEEK')
+            preApprovalProQuery += ' AND CreatedDate = LAST_WEEK';
+                
+        preApprovalProQuery +=' WITH SECURITY_ENFORCED Limit 49900';
+        preApproveProList = Database.query(preApprovalProQuery); 
+        totalApprovalProcess = preApproveProList.size();
+        }else{
+             String preApprovalProQuery = 'SELECT Id, Pre_Approval_Process_Date__c, CustomerPriority__c, (SELECT Status__c FROM Documents__r), Loan_Type__c, AccountSource, Client_Referred_By__c, Partner_Referred_ByCon__c, Referred_By__c, Type, FirstName, LastName, Status__c, Last_Activity_Date__c FROM Account WHERE RecordTypeId =: clientRTID AND Status__c = \'Pre-Qualified\' AND Co_Borrower_Customer__c = NULL AND OwnerId=:requiredUsersId ';
+        
+        if(duration=='THIS_YEAR')
+            preApprovalProQuery += ' AND CreatedDate = LAST_N_DAYS:365';
+        else if(duration=='THIS_MONTH')
+            preApprovalProQuery += ' AND CreatedDate = LAST_N_DAYS:30';
+        else if(duration=='THIS_QUARTER')
+            preApprovalProQuery += ' AND CreatedDate = THIS_QUARTER';
+        else if(duration=='THIS_WEEK')
+            preApprovalProQuery += ' AND CreatedDate = THIS_WEEK';
+        else if(duration=='NEXT_WEEK')
+            preApprovalProQuery += ' AND CreatedDate = NEXT_WEEK';
+        else if(duration=='LAST_WEEK')
+            preApprovalProQuery += ' AND CreatedDate = LAST_WEEK';
+                
+        preApprovalProQuery +=' WITH SECURITY_ENFORCED Limit 49900';
+        preApproveProList = Database.query(preApprovalProQuery); 
+        totalApprovalProcess = preApproveProList.size();
+        }
+        if( userFilter != NULL && String.valueOf(userFilter).startsWith('003')){
+        String nurturQuery = 'SELECT Id, Loan_Type__c, CustomerPriority__c, AccountSource, Client_Referred_By__c, Partner_Referred_ByCon__c, Referred_By__c, Type, FirstName, LastName, Status__c, Last_Activity_Date__c,inflooens__Lead_Priority__c FROM Account where RecordTypeId =: clientRTID AND (Status__c =  \'Nurture\') AND Co_Borrower_Customer__c = NULL AND Partner_Referred_ByCon__c=:userFilter ';
+
+
+        if(duration=='THIS_YEAR')
+        nurturQuery += ' AND CreatedDate = LAST_N_DAYS:365';
+        else if(duration=='THIS_MONTH')
+        nurturQuery += ' AND CreatedDate = LAST_N_DAYS:30';
+        else if(duration=='THIS_QUARTER')
+        nurturQuery += ' AND CreatedDate = THIS_QUARTER';
+        else if(duration=='THIS_WEEK')
+        nurturQuery += ' AND CreatedDate = THIS_WEEK';
+        else if(duration=='NEXT_WEEK')
+        nurturQuery += ' AND CreatedDate = NEXT_WEEK';
+        else if(duration=='LAST_WEEK')
+        nurturQuery += ' AND CreatedDate = LAST_WEEK';
+            
+        nurturQuery +=' WITH SECURITY_ENFORCED Limit 49900';
+        finalNurtureList = Database.query(nurturQuery); 
+        totalNurtureClients = finalNurtureList.size();
+        }else{
+             String nurturQuery = 'SELECT Id, Loan_Type__c, CustomerPriority__c, AccountSource, Client_Referred_By__c, Partner_Referred_ByCon__c, Referred_By__c, Type, FirstName, LastName, Status__c, Last_Activity_Date__c,inflooens__Lead_Priority__c FROM Account where RecordTypeId =: clientRTID AND (Status__c =  \'Nurture\') AND Co_Borrower_Customer__c = NULL';
+
+
+        if(duration=='THIS_YEAR')
+        nurturQuery += ' AND CreatedDate = LAST_N_DAYS:365';
+        else if(duration=='THIS_MONTH')
+        nurturQuery += ' AND CreatedDate = LAST_N_DAYS:30';
+        else if(duration=='THIS_QUARTER')
+        nurturQuery += ' AND CreatedDate = THIS_QUARTER';
+        else if(duration=='THIS_WEEK')
+        nurturQuery += ' AND CreatedDate = THIS_WEEK';
+        else if(duration=='NEXT_WEEK')
+        nurturQuery += ' AND CreatedDate = NEXT_WEEK';
+        else if(duration=='LAST_WEEK')
+        nurturQuery += ' AND CreatedDate = LAST_WEEK';
+            
+        nurturQuery +=' WITH SECURITY_ENFORCED Limit 49900';
+        finalNurtureList = Database.query(nurturQuery); 
+        totalNurtureClients = finalNurtureList.size();
+        }
+        stageList = LoanListViewController.retrievePicklistValues('Set_Up__c', 'Loan_Status__c');
+        system.debug('stageList..... '+stageList);
+                                                    
+        Map<String, Integer> stageMap = new Map<String, Integer>();
+        
+        List<AggregateResult> groupedResults2=new List<AggregateResult>();
+        if( userFilter != NULL && String.valueOf(userFilter).startsWith('003')){
+        String strQuery='SELECT Status__c, count(Id) c FROM Loan__c where inflooens__Borrower_Name__r.inflooens__Partner_Referred_ByCon__c =:userFilter Or inflooens__Processor__c=:requiredUsersId WITH SECURITY_ENFORCED GROUP BY Status__c';
+        system.debug('strQuery&&&&& '+strQuery);
+            groupedResults2 = Database.query(strQuery);
+        }else{
+            String strQuery='SELECT Status__c, count(Id) c FROM Loan__c where OwnerId=:requiredUsersId Or inflooens__Processor__c=:requiredUsersId WITH SECURITY_ENFORCED GROUP BY Status__c';
+         system.debug('strQuery '+strQuery);
+            groupedResults2 = Database.query(strQuery);
+        }   
+        for (AggregateResult ar : groupedResults2)  {
+            stageMap.put(String.valueOf(ar.get(Label.StatusField)), Integer.valueOf(ar.get('c')));
+            //totalLeads += Integer.valueOf(ar.get('c'));
+        }
+        
+        Map<String, Integer> stageMapRed = new Map<String, Integer>();
+        List<AggregateResult> groupedResultsred=new List<AggregateResult>();
+        if( userFilter != NULL && String.valueOf(userFilter).startsWith('003')){
+        String strQueryRed='SELECT Status__c, count(Id) c FROM Loan__c where (inflooens__Borrower_Name__r.inflooens__Partner_Referred_ByCon__c=:userFilter Or inflooens__Processor__c=:requiredUsersId) AND (Close_Supervision_level__c=\'At Risk\' OR (Close_Supervision_level__c!=\'Requires Attention\' AND Contingency_Supervision_level__c=\'At Risk\')) WITH SECURITY_ENFORCED GROUP BY Status__c ';
+       system.debug('strQueryRed3333 '+strQueryRed);
+            groupedResultsred = Database.query(strQueryRed);
+        }else{
+        String strQueryRed='SELECT Status__c, count(Id) c FROM Loan__c where (OwnerId=:requiredUsersId Or inflooens__Processor__c=:requiredUsersId) AND (Close_Supervision_level__c=\'At Risk\' OR (Close_Supervision_level__c!=\'Requires Attention\' AND Contingency_Supervision_level__c=\'At Risk\')) WITH SECURITY_ENFORCED GROUP BY Status__c ';
+         system.debug('strQueryRed '+strQueryRed);
+            groupedResultsred = Database.query(strQueryRed);
+        }
+        for (AggregateResult ar : groupedResultsred)  {
+            stageMapRed.put(String.valueOf(ar.get(Label.StatusField)), Integer.valueOf(ar.get('c')));
+        }
+        
+        Map<String, Integer> stageMapYello = new Map<String, Integer>();
+        List<AggregateResult> groupedResultsyello=new List<AggregateResult>();
+         if( userFilter != NULL && String.valueOf(userFilter).startsWith('003')){
+        String strQueryello='SELECT Status__c, count(Id) c FROM Loan__c where (inflooens__Borrower_Name__r.inflooens__Partner_Referred_ByCon__c=:userFilter Or inflooens__Processor__c=:requiredUsersId) AND (Close_Supervision_level__c=\'Requires Attention\' OR (Close_Supervision_level__c!=\'At Risk\' AND Contingency_Supervision_level__c=\'Requires Attention\')) WITH SECURITY_ENFORCED GROUP BY Status__c ';
+        groupedResultsyello = Database.query(strQueryello);
+         }else{
+         String strQueryello='SELECT Status__c, count(Id) c FROM Loan__c where (OwnerId=:requiredUsersId Or inflooens__Processor__c=:requiredUsersId) AND (Close_Supervision_level__c=\'Requires Attention\' OR (Close_Supervision_level__c!=\'At Risk\' AND Contingency_Supervision_level__c=\'Requires Attention\')) WITH SECURITY_ENFORCED GROUP BY Status__c ';
+        groupedResultsyello = Database.query(strQueryello);
+         }
+        for (AggregateResult ar : groupedResultsyello)  {
+            stageMapYello.put(String.valueOf(ar.get(Label.StatusField)), Integer.valueOf(ar.get('c')));
+        }
+        
+        Map<String, Integer> stageMapgreen = new Map<String, Integer>();
+        List<AggregateResult> groupedResultsgreen=new List<AggregateResult>();
+        if( userFilter != NULL && String.valueOf(userFilter).startsWith('003')){
+        String strQuergreen='SELECT Status__c, count(Id) c FROM Loan__c where (inflooens__Borrower_Name__r.inflooens__Partner_Referred_ByCon__c=:userFilter Or inflooens__Processor__c=:requiredUsersId) AND Close_Supervision_level__c=null AND Contingency_Supervision_level__c=null WITH SECURITY_ENFORCED GROUP BY Status__c ';
+        groupedResultsgreen = Database.query(strQuergreen);
+         }else{
+             String strQuergreen='SELECT Status__c, count(Id) c FROM Loan__c where (OwnerId=:requiredUsersId Or inflooens__Processor__c=:requiredUsersId) AND Close_Supervision_level__c=null AND Contingency_Supervision_level__c=null WITH SECURITY_ENFORCED GROUP BY Status__c ';
+        groupedResultsgreen = Database.query(strQuergreen);
+         }
+        for (AggregateResult ar : groupedResultsgreen)  {
+            stageMapgreen.put(String.valueOf(ar.get(Label.StatusField)), Integer.valueOf(ar.get('c')));
+        }
+        System.debug('sidd'+stageMap);
+        List<LoanWrapper> lstLoans = new List<LoanWrapper>();
+        //lstLoans = LightningTableApexController.extractLoanDetails(duration);
+
+        for(String stage : stageList){
+            ApexTriggerSettings__c setting = ApexTriggerSettings__c.getValues('Inflooens Trigger Settings');
+            List<String> toHideMilestones = new List<String>();
+            if(setting != NULL){
+                toHideMilestones = (setting.inflooens__toohidefunnel__c != NULL && !String.isBlank(setting.inflooens__toohidefunnel__c)) ? setting.inflooens__toohidefunnel__c.split(',') : new List<String>();
+            }
+            List<String> finalHideMilestones = new List<String>();
+            for(String milestone : toHideMilestones) {
+                // System.debug('milestone =>'+milestone);
+                finalHideMilestones.add(milestone.trim());
+            }
+            System.debug('toHideMilestones '+finalHideMilestones);
+
+           // if(!stage.contains('Denied') && !stage.contains('Adverse')){  //Commented by suraj 04/01/2023
+            if((finalHideMilestones.size() > 0 && !finalHideMilestones.contains(stage)) || finalHideMilestones.size() == 0){
+                ChartDetails objChart = new ChartDetails();
+                objChart.label = stage;
+                if(stageMap.containsKey(stage)){
+                
+                    objChart.y = stageMap.get(stage);
+                }
+                else{
+                
+                    objChart.y = 0;
+                }
+                Integer red = 0;
+                Integer green = 0;
+                Integer yellow = 0; 
+                Integer total = 0;
+                objChart.red = stageMapRed.get(stage)==null ? '0' : String.valueOf(stageMapRed.get(stage));
+                objChart.yellow = stageMapYello.get(stage)==null ? '0' : String.valueOf(stageMapYello.get(stage));
+                objChart.green = stageMapgreen.get(stage)==null ? '0' : String.valueOf(stageMapgreen.get(stage));
+                total += Integer.ValueOf(objChart.red) + Integer.ValueOf(objChart.yellow) + Integer.ValueOf(objChart.green);
+                objChart.total = String.valueOf(total);
+                objChart.totalamount = (Decimal) results[0].get('expr0'); 
+                lstChart1.add(objChart);
+                system.debug('lstChart1******'+lstChart1);
+            }
+        }
+    
+        List<Set_Up__c> preProList = new List<Set_Up__c>();
+        List<Set_Up__c> preAppList = new List<Set_Up__c>();
+
+        preProList = [SELECT At_Risk_In_days__c, Requires_Attention_days__c FROM Set_Up__c
+                      WHERE Type__c = 'Client' AND Subtype__c = 'Pre Approval in Process' AND Active__c = TRUE];
+
+        Integer preProRed = 0;
+        Integer preProGreen = 0;
+        Integer preProYellow = 0;
+        
+        for(Account preAppPro : preApproveProList){
+        
+            Integer requestedDocs = 0;
+            Integer reviewDocs = 0;
+            Integer rejectedDocs = 0;
+            Integer acceptedDocs = 0;
+            
+            
+            for(Document__c doc : preAppPro.Documents__r){
+            
+                if(doc.Status__c == 'Requested'){
+                
+                    requestedDocs += 1;
+                }
+                if(doc.Status__c == 'Review Pending'){
+                
+                    reviewDocs += 1;
+                }
+                if(doc.Status__c == 'Accepted'){
+                
+                    acceptedDocs += 1;
+                }
+                if(doc.Status__c == 'Rejected'){
+                
+                    rejectedDocs += 1;
+                }
+            }
+
+            if(preProList.size() > 0){
+                if(preProList.get(0).At_Risk_In_days__c != NULL && preAppPro.Pre_Approval_Process_Date__c != NULL && System.Today() >= preAppPro.Pre_Approval_Process_Date__c.addDays(Integer.valueOf(preProList.get(0).At_Risk_In_days__c))){
+                    preProRed += 1;
+                    preAppPro.Sic = 'Red';
+                }
+                else if(preProList.get(0).Requires_Attention_days__c != NULL && preAppPro.Pre_Approval_Process_Date__c != NULL && System.Today() >= preAppPro.Pre_Approval_Process_Date__c.addDays(Integer.valueOf(preProList.get(0).Requires_Attention_days__c))){
+                    preProYellow += 1;
+                    preAppPro.Sic = 'Yellow';
+                }
+                else{
+                    preProGreen += 1;
+                    preAppPro.Sic = 'Green';
+                }
+            }
+            
+            preAppPro.Requested_Docs__c = requestedDocs;
+            preAppPro.Review_Pending_Docs__c = reviewDocs;
+            preAppPro.Rejected_Docs__c = rejectedDocs;
+            preAppPro.Accepted_Docs__c = acceptedDocs;
+        }
+
+        preAppList = [SELECT At_Risk_In_days__c, Requires_Attention_days__c FROM Set_Up__c
+                      WHERE Type__c = 'Client' AND Subtype__c = 'Pre Approved' AND Active__c = TRUE];
+
+        Integer appRed = 0;
+        Integer appGreen = 0;
+        Integer appYellow = 0;
+
+        for(Account preApproved : preApprovedList){
+        
+            if(preAppList.size() > 0){
+                if(preAppList.get(0).At_Risk_In_days__c != NULL && preApproved.Pre_Approved_Date__c != NULL && System.Today() >= preApproved.Pre_Approved_Date__c.addDays(Integer.valueOf(preAppList.get(0).At_Risk_In_days__c))){
+                    appRed += 1;
+                    preApproved.Sic = 'Red';
+                }
+                else if(preAppList.get(0).Requires_Attention_days__c != NULL && preApproved.Pre_Approved_Date__c != NULL && System.Today() >= preApproved.Pre_Approved_Date__c.addDays(Integer.valueOf(preAppList.get(0).Requires_Attention_days__c))){
+                    appYellow += 1;
+                    preApproved.Sic = 'Yellow';
+                }
+                else{
+                    appGreen += 1;
+                    preApproved.Sic = 'Green';
+                }
+            }
+        }
+        
+        ChartDetails objChart = new ChartDetails();
+        objChart.y = totalLeads;
+        objChart.label = 'Leads';
+        objChart.accList = finalaccList;
+        objChart.totalamount = (Decimal) results[0].get('expr0'); 
+        lstChart.add(objChart);
+
+        ChartDetails objChart1 = new ChartDetails();
+        objChart1.y = totalApprovalProcess;
+        objChart1.label = 'Pre-Qualified';
+        if(totalApprovalProcess > 0){
+            objChart1.redPercent = Math.round((preProRed*100)/totalApprovalProcess) == 0 ? 5 : Math.round((preProRed*100)/totalApprovalProcess);
+            objChart1.yellowPercent = Math.round((preProYellow*100)/totalApprovalProcess) == 0 ? 5 : Math.round((preProYellow*100)/totalApprovalProcess);
+            objChart1.greenPercent = Math.round((preProGreen*100)/totalApprovalProcess) == 0 ? 5 : Math.round((preProGreen*100)/totalApprovalProcess);
+        }
+        objChart1.accList = preApproveProList;
+        objChart1.red = String.valueOf(preProRed);
+        objChart1.green = String.valueOf(preProGreen);
+        objChart1.yellow = String.valueOf(preProYellow);
+        objChart1.totalamount = (Decimal) results[0].get('expr0'); 
+        lstChart.add(objChart1);
+        
+        ChartDetails objChart2 = new ChartDetails();
+        objChart2.y = totalPreApproved;
+        objChart2.label = 'Pre-approved';
+        if(totalPreApproved > 0){
+            objChart2.redPercent = Math.round((appRed*100)/totalPreApproved) == 0 ? 5 : Math.round((appRed*100)/totalPreApproved);
+            objChart2.yellowPercent = Math.round((appYellow*100)/totalPreApproved) == 0 ? 5 : Math.round((appYellow*100)/totalPreApproved);
+            objChart2.greenPercent = Math.round((appGreen*100)/totalPreApproved) == 0 ? 5 : Math.round((appGreen*100)/totalPreApproved);
+        }
+        objChart2.accList = preApprovedList;
+        objChart2.red = String.valueOf(appRed);
+        objChart2.green = String.valueOf(appGreen);
+        objChart2.yellow = String.valueOf(appYellow);
+        objChart2.totalamount = (Decimal) results[0].get('expr0'); 
+        lstChart.add(objChart2);
+        
+        ChartDetails objChart3 = new ChartDetails();
+        objChart3.y = totalNurtureClients;
+        objChart3.label = 'Nurture';
+        objChart3.accList = finalNurtureList;
+        objChart3.totalamount = (Decimal) results[0].get('expr0'); 
+        lstChart.add(objChart3);
+
+        lstChart.addAll(lstChart1);
+        system.debug('lstChart '+lstChart);
+
+        // AggregateResult[] results;
+        // results = [select SUM(Original_Loan_Amount__c) from inflooens__Loan__c where inflooens__Borrower_Name__r.inflooens__Partner_Referred_ByCon__c=:userFilter ];
+        // ChartDetails objChart4 = new ChartDetails();
+        // objChart4.totalamount = (Decimal) results[0].get('expr0'); 
+        // lstChart.add(objChart4);
+        return lstChart;
+    }
+
+    @AuraEnabled
+    public static List<ChartDetails> extractChartData1(String objectName, String duration){
+            List<ChartDetails> lstChart = new List<ChartDetails>();
+            List<ChartDetails> lstChart1 = new List<ChartDetails>();
+            system.debug('**Duration='+ duration);
+            Integer totalLeads = 0;
+            Integer totalNurtureClients = 0;
+            Integer dur = 365;
+            
+        
+            //For preapproved
+            AggregateResult[] groupedResults1 = [SELECT Status__c, count(Id) c
+                                                 FROM Account where status__c='Pre-Approved' WITH SECURITY_ENFORCED
+                                                 GROUP BY Status__c];
+            
+            for (AggregateResult ar : groupedResults1)  {
+                System.debug('==>count amount' + ar.get('c'));
+                
+                ChartDetails objChart = new ChartDetails();
+                ChartDetails objChart3 = new ChartDetails();
+
+                objChart.y = Integer.valueOf(ar.get('c'));
+                objChart3.y = Integer.valueOf(ar.get('c'));
+
+                if(!Test.IsRunningTest()){
+                objChart.label = ar.get(Label.StatusField)+'';//'Leads';
+                //totalLeads += objChart.y;
+                lstChart1.add(objChart);
+                }
+               else if(!Test.IsRunningTest()){
+                objChart3.label = ar.get(Label.StatusField)+'';//'Nurture';
+                lstChart1.add(objChart3);
+               }
+
+            }
+            //--End Preapproved
+        
+            AggregateResult[] groupedResults = [SELECT Loan_Status__c, count(Id) c
+                                                FROM Account WHERE IsDeleted = FALSE WITH SECURITY_ENFORCED
+                                                GROUP BY Loan_Status__c];
+            
+            List<AggregateResult> groupedResults2=new List<AggregateResult>();
+            String strQuery='SELECT Loan_Status__c, count(Id) c FROM Account ';
+        
+            if(duration=='THIS_YEAR')
+                strQuery += ' where CreatedDate = LAST_N_DAYS:365';
+            else if(duration=='THIS_MONTH')
+                strQuery += ' where CreatedDate = LAST_N_DAYS:30';
+            else if(duration=='THIS_QUARTER')
+                strQuery += ' where CreatedDate = THIS_QUARTER';
+            else if(duration=='THIS_WEEK')
+                strQuery += ' where CreatedDate = THIS_WEEK';
+            else if(duration=='NEXT_WEEK')
+                strQuery += ' where CreatedDate = NEXT_WEEK';
+            else if(duration=='LAST_WEEK')
+                strQuery += ' where CreatedDate = LAST_WEEK';
+                    
+            strQuery+=' WITH SECURITY_ENFORCED GROUP BY Loan_Status__c';
+            groupedResults2 = Database.query(strQuery); 
+        
+            for (AggregateResult ar : groupedResults2)  {
+                System.debug('--staut ID=' + ar.get(Label.LoanStatus));
+                System.debug('count amount' + ar.get('c'));
+                
+                ChartDetails objChart = new ChartDetails();
+                objChart.y = Integer.valueOf(ar.get('c'));
+                if(!Test.IsRunningTest())
+                objChart.label = ar.get('Loan_Status__c')+'';//'Leads';
+                
+                totalLeads += objChart.y;
+                lstChart1.add(objChart);
+    
+                ChartDetails objChart3 = new ChartDetails();
+                objChart3.y = Integer.valueOf(ar.get('c'));
+                if(!Test.IsRunningTest())
+                objChart3.label = ar.get('Loan_Status__c')+'';//'Nurture';
+                
+                totalNurtureClients += objChart3.y;
+                lstChart1.add(objChart3);
+
+            }
+        
+        ChartDetails objChart = new ChartDetails();
+        objChart.y = totalLeads;
+        objChart.label = 'Leads';
+        lstChart.add(objChart);
+        lstChart.addAll(lstChart1);
+
+
+        
+        ChartDetails objChart3 = new ChartDetails();
+        objChart3.y = totalNurtureClients;
+        objChart3.label = 'Nurture';
+        lstChart.add(objChart3);
+        lstChart.addAll(lstChart1);
+
+        
+        return lstChart;
+    }
+    
+       @AuraEnabled
+    public static PaginationWrapper extractData(String strJson, Decimal pageNumber ,Integer recordToDisply, String schStr,String userFilter){
+        //String userFilter='hcbhuwuhcbhw';
+        // data filter code by shubham=========
+         List < User > requiredUsers = new List < user > ();
+
+        Set < id > requiredUsersId = new Set < id > ();
+
+
+        if (userFilter.containsIgnoreCase('My Team')) {
+            requiredUsers = InfloHomePageController.NewgetUsersUnder(UserInfo.getUserId(), String.valueOf(Date.Today().Year()));
+            for (User u: requiredUsers) {
+                requiredUsersId.add(u.id);
+            }
+        } else if (userFilter.containsIgnoreCase('My Company') || userFilter.containsIgnoreCase('All')) {
+            for (user u: [Select id from User WHERE IsActive = TRUE AND AccountId = NULL WITH SECURITY_ENFORCED LIMIT 40000]) {
+                requiredUsersId.add(u.id);
+            }
+        } else {
+            requiredUsersId.add(UserInfo.getUserId());
+        }
+        //================data filter=================
+                          
+        Integer pageSize = recordToDisply;
+        Integer offset = ((Integer)pageNumber - 1) * pageSize;
+        
+        List<Set_Up__c> milestoneColumnList = new List<Set_Up__c>();
+        SearchWrapper objWrapper = new SearchWrapper();
+        String strFilter='';
+        if(strJson!=null){
+        
+            objWrapper = objWrapper.parse(strJson);
+            String strStatus = objWrapper.strStatus;
+            if(objWrapper.strDuration=='THIS_YEAR')
+                strFilter = ' where CreatedDate = LAST_N_DAYS:365';
+            else if(objWrapper.strDuration=='THIS_MONTH')
+                strFilter = ' where CreatedDate = LAST_N_DAYS:30';
+            else if(objWrapper.strDuration =='THIS_QUARTER')
+                strFilter += ' where CreatedDate = THIS_QUARTER';
+            else if(objWrapper.strDuration =='THIS_WEEK')
+                strFilter += ' where CreatedDate = THIS_WEEK';
+            else if(objWrapper.strDuration =='NEXT_WEEK')
+                strFilter += ' where CreatedDate = NEXT_WEEK';
+            else if(objWrapper.strDuration=='LAST_WEEK')
+                strFilter += ' where CreatedDate = LAST_WEEK';
+                
+            String strOperator = (strFilter==null || strFilter=='')?' where ':' AND ';
+            
+            if(objWrapper.strStatus=='Leads'){
+                //strFilter += strOperator +' Status__c=\'Lead\'';
+            }
+            else if(objWrapper.strStatus=='Nurture'){
+                //strFilter += strOperator +' Status__c=\'Nurture\'';
+            }
+            else if(objWrapper.strStatus=='All'){
+                //strFilter = ' Where Status__c=\''+ objWrapper.strStatus+'\'';
+            }else{
+                strFilter += String.escapeSingleQuotes(strOperator)+' Status__c=: strStatus AND (OwnerId=:requiredUsersId OR inflooens__Processor__c=:requiredUsersId) ';
+            }            
+            
+            milestoneColumnList = [SELECT Loan_Status__c, Milestone_Column_Names__c, Tier_Description__c
+                               FROM Set_Up__c
+                               WHERE Type__c = 'Loan' AND Subtype__c = 'Loan Milestone Columns' AND Loan_Status__c =: strStatus 
+                               WITH SECURITY_ENFORCED LIMIT 1 ];
+        }
+        
+        List<String> columnNames = new List<String>();
+        List<String> columnAPINames = new List<String>();
+        
+        if(milestoneColumnList != NULL && milestoneColumnList.size() > 0){
+        
+            if(milestoneColumnList.get(0).Milestone_Column_Names__c.contains(',')){
+            
+                columnNames.addAll(milestoneColumnList.get(0).Milestone_Column_Names__c.split(','));
+            }
+            else{
+            
+                columnNames.add(milestoneColumnList.get(0).Milestone_Column_Names__c);
+            }
+        }
+        
+        if(milestoneColumnList != NULL && milestoneColumnList.size() > 0){
+        
+            if(milestoneColumnList.get(0).Tier_Description__c.contains(',')){
+            
+                columnAPINames.addAll(milestoneColumnList.get(0).Tier_Description__c.split(','));
+            }
+            else{
+            
+                columnAPINames.add(milestoneColumnList.get(0).Tier_Description__c);
+            }
+        }
+        
+                                       
+        //get Record Type Ids of Service Account
+        List<String> devRecordTypeIds = new List<String> ();
+        String strQuery = 'select ';
+        String strQueryTotal;
+        for(String columns : columnAPINames){
+        
+            if(columns.contains('__c') || columns.contains('__r')){
+            
+                strQuery += columns + ',';
+            }
+        }
+        
+        strQuery += 'Contingency_Supervision_level__c, Close_Supervision_level__c, Borrower_Name__r.AccountSource,'+
+                    'Borrower_Name__r.Referred_By__c,inflooens__Borrower_Name__r.inflooens__Client_Referred_By__c,'+
+                    'inflooens__Borrower_Name__r.inflooens__Partner_Referred_ByCon__c, Borrower_Name__r.Type,'+
+                    'Borrower_Name__r.Name,Borrower_Name__c, Loan_Originator_Email__c,Loan_Originator_Phone__c, Status__c,'+
+                    'lastmodifieddate,'+
+                    '(SELECT Document__c, Document__r.Name, Document__r.Description__c, Document__r.Status__c, Document__r.Type__c,'+
+                     'Document__r.File_Image__c, Document__r.File_ID__c, Document__r.CreatedDate, Document__r.LastModifiedDate,'+
+                     'Document__r.Modified_On__c, Document__r.Received_On__c, Loan__r.Loan_Type__c, Document__r.Contact__c,'+
+                     'Document__r.Client__c'+
+                     ' FROM Loan_Documents__r),'+
+                     '(SELECT Subject, Supervision_level__c,Supervision_Status__c,Task_Loan_Type__c, ActivityDate, Status FROM Tasks),'+
+                     '(SELECT Status__c FROM Conditions__r) From Loan__c ';
+                    
+        if(strFilter!=null)
+            strQuery+=strFilter;
+           
+            if (!String.isBlank(schStr)) {   
+               
+               String searchCondition = '';
+                
+               if(!strQuery.containsIgnoreCase('WHERE')){
+                   searchCondition = ' WHERE (inflooens__Borrower_Name__r.Name LIKE \'%'+String.escapeSingleQuotes(schStr)+'%\' )';
+               }
+               else{
+                   searchCondition = ' AND (inflooens__Borrower_Name__r.Name LIKE \'%'+String.escapeSingleQuotes(schStr)+'%\' )';
+               }
+               strQuery +=  searchCondition;
+               system.debug('searchCondition###'+searchCondition);      
+            }
+            system.debug('strQuery###'+strQuery);
+
+        //strQueryTotal = strQuery + ' WITH SECURITY_ENFORCED Limit 49900';
+        strQuery += ' WITH SECURITY_ENFORCED LIMIT :recordToDisply OFFSET :offset';
+
+
+     
+   
+
+        string totalquery='SELECT Count(Id) tCount FROM Loan__c  where  Status__c=: strStatus AND (OwnerId=:requiredUsersId OR inflooens__Processor__c=:requiredUsersId) WITH SECURITY_ENFORCED';
+            AggregateResult totalC=Database.query(totalquery);
+        
+        List<Loan__c> lstClients1 = new List<Loan__c>();
+        
+        if(objWrapper.strStatus != 'Leads')
+        lstClients1 = Database.query(strQuery);
+        system.debug('lstClients1###'+lstClients1);
+
+        if(objWrapper.strStatus != 'Nurture')
+        lstClients1 = Database.query(strQuery);
+        system.debug('lstClients1###'+lstClients1);
+
+        PaginationWrapper pgWrap = new PaginationWrapper();
+        pgWrap.pageSize = pageSize;
+        pgWrap.page = (Integer) pageNumber;
+        pgWrap.total =(Integer)totalC.get('tCount');
+       // pgWrap.total = Database.query(strQueryTotal).size();
+        
+        List<LoanWrapper> lstClients = new List<LoanWrapper>();
+
+        Set<Id> clientIds = new Set<Id>();
+        for(Loan__c objLoan : lstClients1){
+            clientIds.add(objLoan.Borrower_Name__c);
+        }
+        List<Document__c> docList = new List<Document__c>();
+        docList = [SELECT ID, Status__c, Client__c FROM Document__c WHERE Client__c IN: clientIds WITH SECURITY_ENFORCED];
+        //For Document Calculation
+
+        
+        for(Loan__c objLoan : lstClients1){
+            LoanWrapper objClientWrap = new LoanWrapper(objLoan, columnNames, columnAPINames);
+            Integer requestedDocsClient = 0;
+            Integer reviewDocsClient = 0;
+            Integer rejectedDocsClient = 0;
+            Integer acceptedDocsClient = 0;
+
+            for(Document__c doc : docList){
+                if(doc.Client__c == objLoan.Borrower_Name__c){
+                    if(doc.Status__c == 'Requested'){
+                        
+                        requestedDocsClient += 1;
+                    }
+                    if(doc.Status__c == 'Review Pending'){
+                    
+                        reviewDocsClient += 1;
+                    }
+                    if(doc.Status__c == 'Accepted'){
+                    
+                        acceptedDocsClient += 1;
+                    }
+                    if(doc.Status__c == 'Rejected'){
+                    
+                        rejectedDocsClient += 1;
+                    }
+                }
+            }
+            objClientWrap.requestedDocsClient = requestedDocsClient;
+            objClientWrap.reviewDocsClient = reviewDocsClient;
+            objClientWrap.acceptedDocsClient = acceptedDocsClient;
+            objClientWrap.rejectedDocsClient = rejectedDocsClient;
+            lstClients.add(objClientWrap);
+        }
+        pgWrap.loanWrapList = lstClients;
+        return pgWrap;
+    }
+
+     
+    @AuraEnabled
+    public static PaginationWrapper extractDataSort(String strJson,String approvedKey, Decimal pageNumber ,Integer recordToDisply,string SortColumnName,string sortBy,String userFilter){
+         // data filter code by shubham=========
+         system.debug('userFilter------>'+userFilter);
+          system.debug('recordToDisply'+recordToDisply);
+         List < User > requiredUsers = new List < user > ();
+
+         Set < id > requiredUsersId = new Set < id > ();
+ 
+ 
+         if (userFilter.containsIgnoreCase('My Team')) {
+             requiredUsers = InfloHomePageController.NewgetUsersUnder(UserInfo.getUserId(), String.valueOf(Date.Today().Year()));
+             for (User u: requiredUsers) {
+                 requiredUsersId.add(u.id);
+             }
+         } else if (userFilter.containsIgnoreCase('My Company') || userFilter.containsIgnoreCase('All')) {
+             for (user u: [Select id from User WHERE IsActive = TRUE AND AccountId = NULL WITH SECURITY_ENFORCED LIMIT 40000]) {
+                 requiredUsersId.add(u.id);
+             }
+         } else {
+             requiredUsersId.add(UserInfo.getUserId());
+         }
+         //================data filter=================                         
+        Integer pageSize = recordToDisply;
+        Integer offset = ((Integer)pageNumber - 1) * pageSize;
+        
+        List<Set_Up__c> milestoneColumnList = new List<Set_Up__c>();
+        SearchWrapper objWrapper = new SearchWrapper();
+        String strFilter='';
+        if(strJson!=null){
+        
+            objWrapper = objWrapper.parse(strJson);
+            String strStatus = objWrapper.strStatus;
+            if(objWrapper.strDuration=='THIS_YEAR')
+                strFilter = ' where CreatedDate = LAST_N_DAYS:365';
+            else if(objWrapper.strDuration=='THIS_MONTH')
+                strFilter = ' where CreatedDate = LAST_N_DAYS:30';
+            else if(objWrapper.strDuration =='THIS_QUARTER')
+                strFilter += ' where CreatedDate = THIS_QUARTER';
+            else if(objWrapper.strDuration =='THIS_WEEK')
+                strFilter += ' where CreatedDate = THIS_WEEK';
+            else if(objWrapper.strDuration =='NEXT_WEEK')
+                strFilter += ' where CreatedDate = NEXT_WEEK';
+            else if(objWrapper.strDuration=='LAST_WEEK')
+                strFilter += ' where CreatedDate = LAST_WEEK';
+                
+            String strOperator = (strFilter==null || strFilter=='')?' where ':' AND ';
+            
+            if(objWrapper.strStatus=='Leads'){
+                //strFilter += strOperator +' Status__c=\'Lead\'';
+            }
+            else if(objWrapper.strStatus=='Nurture'){
+                //strFilter += strOperator +' Status__c=\'Nurture\'';
+            }else if(objWrapper.strStatus=='All'){
+                //strFilter = ' Where Status__c=\''+ objWrapper.strStatus+'\'';
+            }else if(userFilter != NULL && String.valueOf(userFilter).startsWith('003')){
+                
+                strFilter += String.escapeSingleQuotes(strOperator)+' Status__c=: strStatus AND (inflooens__Borrower_Name__r.inflooens__Partner_Referred_ByCon__c=:userFilter OR inflooens__Processor__c=:requiredUsersId)';
+            }    
+            else{
+                strFilter += String.escapeSingleQuotes(strOperator)+' Status__c=: strStatus AND (OwnerId=:requiredUsersId OR inflooens__Processor__c=:requiredUsersId)';
+
+            }        
+            
+            milestoneColumnList = [SELECT Loan_Status__c, Milestone_Column_Names__c, Tier_Description__c
+                               FROM Set_Up__c
+                               WHERE Type__c = 'Loan' AND Subtype__c = 'Loan Milestone Columns' AND Loan_Status__c =: strStatus 
+                               WITH SECURITY_ENFORCED LIMIT 1 ];
+        
+        }
+        
+        List<String> columnNames = new List<String>();
+        List<String> columnAPINames = new List<String>();
+        
+        if(milestoneColumnList != NULL && milestoneColumnList.size() > 0){
+        
+            if(milestoneColumnList.get(0).Milestone_Column_Names__c.contains(',')){
+            
+                columnNames.addAll(milestoneColumnList.get(0).Milestone_Column_Names__c.split(','));
+            }
+            else{
+            
+                columnNames.add(milestoneColumnList.get(0).Milestone_Column_Names__c);
+            }
+        }
+        
+        if(milestoneColumnList != NULL && milestoneColumnList.size() > 0){
+        
+            if(milestoneColumnList.get(0).Tier_Description__c.contains(',')){
+            
+                columnAPINames.addAll(milestoneColumnList.get(0).Tier_Description__c.split(','));
+            }
+            else{
+            
+                columnAPINames.add(milestoneColumnList.get(0).Tier_Description__c);
+            }
+        }
+        
+                                       
+        //get Record Type Ids of Service Account
+        List<String> devRecordTypeIds = new List<String> ();
+        String strQuery = 'select ';
+        String strQueryTotal;
+        for(String columns : columnAPINames){
+        
+            if(columns.contains('__c') || columns.contains('__r')){
+            
+                strQuery += columns + ',';
+            }
+        }
+        
+
+        strQuery += 'Contingency_Supervision_level__c, Close_Supervision_level__c, Borrower_Name__r.AccountSource,'+
+                    'Borrower_Name__r.Referred_By__c,inflooens__Borrower_Name__r.inflooens__Client_Referred_By__c,'+
+                    'inflooens__Borrower_Name__r.inflooens__Partner_Referred_ByCon__c, Borrower_Name__r.Type,'+
+                    'Borrower_Name__r.Name,Borrower_Name__c, Loan_Originator_Email__c,Loan_Originator_Phone__c, Status__c,'+
+                    'lastmodifieddate,'+
+                    '(SELECT Document__c, Document__r.Name, Document__r.Description__c, Document__r.Status__c, Document__r.Type__c,'+
+                     'Document__r.File_Image__c, Document__r.File_ID__c, Document__r.CreatedDate, Document__r.LastModifiedDate,'+
+                     'Document__r.Modified_On__c, Document__r.Received_On__c, Loan__r.Loan_Type__c, Document__r.Business_Partner__c,'+
+                     'Document__r.Client__c,Document__r.inflooens__Contact__c'+
+                     ' FROM Loan_Documents__r),'+
+                     '(SELECT Subject, Supervision_level__c,Task_Loan_Type__c,inflooens__Supervision_Status__c, ActivityDate, Status FROM Tasks),'+
+                     '(SELECT Status__c FROM Conditions__r) From Loan__c ';
+
+        if(strFilter!=null)
+            strQuery+=strFilter;
+
+             if (!String.isBlank(approvedKey)) {   
+               
+               String searchCondition = '';
+                
+               if(!strQuery.containsIgnoreCase('WHERE')){
+                   searchCondition = ' WHERE (inflooens__Borrower_Name__r.Name LIKE \'%'+String.escapeSingleQuotes(approvedKey)+'%\' )';
+               }
+               else{
+                   searchCondition = ' AND (inflooens__Borrower_Name__r.Name LIKE \'%'+String.escapeSingleQuotes(approvedKey)+'%\' )';
+               }
+               strQuery +=  searchCondition;
+               system.debug('searchCondition###'+searchCondition);      
+            }
+            system.debug('strQuery###'+strQuery);
+        
+        //strQueryTotal = strQuery + ' WITH SECURITY_ENFORCED Limit 49900'; commented at lage data issue jun 2023
+        
+        if(sortBy=='DESC'){
+            sortBy+=' NULLS LAST ';
+        }
+        if(SortColumnName=='ClientName'){
+        strQuery += ' WITH SECURITY_ENFORCED ORDER BY Borrower_Name__r.Name ' +sortBy+'  Limit :recordToDisply OFFSET :offset';
+        }
+        else if(SortColumnName=='flag'){
+         strQuery += ' WITH SECURITY_ENFORCED ORDER BY Close_Supervision_level__c ' +sortBy+'  Limit :recordToDisply OFFSET :offset';   
+        }
+        else{
+          strQuery += ' WITH SECURITY_ENFORCED ORDER BY '+SortColumnName+' ' +sortBy+'  Limit :recordToDisply OFFSET :offset';  
+        }
+        system.debug('strQuery=====>'+strQuery);
+
+
+          
+        List<Loan__c> lstClients1 = new List<Loan__c>();
+        
+        if(objWrapper.strStatus != 'Leads')
+        lstClients1 = Database.query(strQuery);
+        
+        else if(objWrapper.strStatus != 'Nurture')
+        lstClients1 = Database.query(strQuery);
+         PaginationWrapper pgWrap = new PaginationWrapper();
+       if( userFilter != NULL && String.valueOf(userFilter).startsWith('003')){
+        string totalquery='SELECT Count(Id) tCount FROM Loan__c  where  Status__c=: strStatus AND (inflooens__Borrower_Name__r.inflooens__Partner_Referred_ByCon__c=:userFilter OR inflooens__Processor__c=:requiredUsersId) WITH SECURITY_ENFORCED';
+        AggregateResult totalC=Database.query(totalquery);
+           
+        pgWrap.pageSize = pageSize;
+        pgWrap.page = (Integer) pageNumber;
+        //pgWrap.total = Database.query(strQueryTotal).size(); commented at lage data issue jun 2023
+        pgWrap.total =(Integer)totalC.get('tCount');
+        }else{
+             string totalquery='SELECT Count(Id) tCount FROM Loan__c  where  Status__c=: strStatus AND (OwnerId=:requiredUsersId OR inflooens__Processor__c=:requiredUsersId) WITH SECURITY_ENFORCED';
+        AggregateResult totalC=Database.query(totalquery);
+          //  PaginationWrapper pgWrap = new PaginationWrapper();
+        pgWrap.pageSize = pageSize;
+        pgWrap.page = (Integer) pageNumber;
+        //pgWrap.total = Database.query(strQueryTotal).size(); commented at lage data issue jun 2023
+        pgWrap.total =(Integer)totalC.get('tCount');
+        }
+        
+
+        List<LoanWrapper> lstClients = new List<LoanWrapper>();
+
+        Set<Id> clientIds = new Set<Id>();
+        for(Loan__c objLoan : lstClients1){
+            clientIds.add(objLoan.Borrower_Name__c);
+        }
+        List<Document__c> docList = new List<Document__c>();
+        docList = [SELECT ID, Status__c, Client__c, inflooens__Contact__c  FROM Document__c WHERE Client__c IN: clientIds WITH SECURITY_ENFORCED];
+        //For Document Calculation
+
+        
+        for(Loan__c objLoan : lstClients1){
+            LoanWrapper objClientWrap = new LoanWrapper(objLoan, columnNames, columnAPINames);
+            Integer requestedDocsClient = 0;
+            Integer reviewDocsClient = 0;
+            Integer rejectedDocsClient = 0;
+            Integer acceptedDocsClient = 0;
+
+            for(Document__c doc : docList){
+                if(doc.Client__c == objLoan.Borrower_Name__c){
+                    if(doc.Status__c == 'Requested'){
+                        
+                        requestedDocsClient += 1;
+                    }
+                    if(doc.Status__c == 'Review Pending'){
+                    
+                        reviewDocsClient += 1;
+                    }
+                    if(doc.Status__c == 'Accepted'){
+                    
+                        acceptedDocsClient += 1;
+                    }
+                    if(doc.Status__c == 'Rejected'){
+                    
+                        rejectedDocsClient += 1;
+                    }
+                }
+            }
+            objClientWrap.requestedDocsClient = requestedDocsClient;
+            objClientWrap.reviewDocsClient = reviewDocsClient;
+            objClientWrap.acceptedDocsClient = acceptedDocsClient;
+            objClientWrap.rejectedDocsClient = rejectedDocsClient;
+            lstClients.add(objClientWrap);
+        }
+        pgWrap.loanWrapList = lstClients;
+        system.debug('pgWrap'+pgWrap);
+        return pgWrap;
+    }
+    @AuraEnabled
+    public static List<LoanWrapper> extractLoanDetails(String duration){
+                                   
+        String strFilter='';
+
+        if(duration != null){
+        
+
+            if(duration == 'THIS_YEAR')
+                strFilter = ' where CreatedDate = LAST_N_DAYS:365';
+            else if(duration == 'THIS_MONTH')
+                strFilter = ' where CreatedDate = LAST_N_DAYS:30';
+            else if(duration=='THIS_QUARTER')
+                strFilter += ' where CreatedDate = THIS_QUARTER';
+            else if(duration=='THIS_WEEK')
+                strFilter += ' where CreatedDate = THIS_WEEK';
+            else if(duration=='NEXT_WEEK')
+                strFilter += ' where CreatedDate = NEXT_WEEK';
+            else if(duration=='LAST_WEEK')
+                strFilter += ' where CreatedDate = LAST_WEEK';
+                
+            /*String strOperator = (strFilter==null || strFilter=='')?' where ':' AND ';
+            strFilter += String.escapeSingleQuotes(strOperator)+' Status__c=: strStatus';*/
+        }
+        String strQuery = 'select ';
+        strQuery += 'Contingency_Supervision_level__c, Close_Supervision_level__c, Borrower_Name__r.AccountSource,'+
+                    'Borrower_Name__r.Referred_By__c,inflooens__Borrower_Name__r.inflooens__Client_Referred_By__c,'+
+                    'inflooens__Borrower_Name__r.inflooens__Partner_Referred_ByCon__c, Borrower_Name__r.Type,'+
+                    'Borrower_Name__r.Name,Borrower_Name__c, Loan_Originator_Email__c,Loan_Originator_Phone__c, Status__c,'+
+                    'lastmodifieddate From Loan__c';
+                    
+        if(strFilter!=null)
+        strQuery += strFilter;
+        strQuery += ' WITH SECURITY_ENFORCED LIMIT 49990';
+        List<Loan__c> lstClients1 = new List<Loan__c>();
+        
+        lstClients1 = Database.query(strQuery);
+        List<String> columnNames = new List<String>();
+        List<String> columnAPINames = new List<String>();
+        
+        List<LoanWrapper> lstClients = new List<LoanWrapper>();
+        
+        for(Loan__c objLoan : lstClients1){
+            LoanWrapper objClientWrap = new LoanWrapper(objLoan, columnNames, columnAPINames);
+            
+            lstClients.add(objClientWrap);
+        }
+        return lstClients;
+    }
+}

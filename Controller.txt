@@ -1,0 +1,372 @@
+({
+    initializeTable : function(cmp, event, helper){
+        var sPageURL = decodeURIComponent(window.location.search.substring(0));
+        // set auto height as per the funel
+        
+        if(sPageURL!=null && sPageURL!='undefined' && sPageURL!='' ){
+            cmp.set('v.isFullScreen',true);
+            try{ 
+                var pageReference = cmp.get("v.pageReference");
+                //cmp.set("v.strUrl", pageReference.state.c__strStatus);
+                if(pageReference.state.c__strStatus!=null && pageReference.state.c__strStatus!='undefined' && pageReference.state.c__strStatus!='' ){
+                    var strJSON = '{"strChartType" : "funnel",'+
+                        '"strStatus":"'+ pageReference.state.c__strStatus +'",'+
+                        '"strDuration":"'+pageReference.state.c__duration+'",'+
+                        '"percentage": 100,'+
+                        '"Value":20}';
+                    
+                    cmp.set("v.strJson", strJSON);
+                    cmp.set("v.strStatus", pageReference.state.c__strStatus);
+                }
+            } catch (e) {
+                console.error(e);
+            }
+        }else{
+            //cmp.set('v.strUrl','/lightning/n/clientreport?c__fullscreen=true&c__strStatus='+cmp.get("v.strStatus"));
+            cmp.set('v.strUrl','/lightning/cmp/c__LightningTable?c__fullscreen=true&c__strStatus='+cmp.get("v.strStatus")+'&c__duration='+cmp.get("v.strDuration"));
+            var strDuration = cmp.get("v.strDuration");
+            if(strDuration!=null){
+                var strStatus = cmp.get("v.strStatus");//(cmp.get("v.strStatus")!='undefined')?cmp.get("v.strStatus"):'All';
+                if(strStatus==='undefined' || strStatus=='' || strStatus==null){
+                    strStatus='All';
+                }
+                
+                var strJSON = '{"strChartType" : "funnel",'+
+                    '"strStatus":"'+strStatus+'",'+
+                    '"strDuration":"'+strDuration+'",'+
+                    '"percentage": 100,'+
+                    '"Value":20}';
+                console.log('**Duration JSON='+ strJSON);
+                cmp.set("v.strJson", strJSON);
+            }
+        }
+        var url;
+        if(cmp.get("v.strStatus") == 'Leads'){
+            var pageReference = {
+                type: 'standard__component',
+                attributes: {
+                    componentName: 'inflooens__ClientListViewComponent',
+                },
+            };
+            cmp.set("v.pageReference", pageReference);
+        }
+        else if(cmp.get("v.strStatus") == 'Nurture'){
+            var pageReference = {
+                type: 'standard__component',
+                attributes: {
+                    componentName: 'inflooens__ClientListViewComponent',
+                },
+            };
+            cmp.set("v.pageReference", pageReference);
+        }
+        else if(cmp.get("v.strStatus") == 'Pre-Qualified'){
+            var pageReference = {
+                type: 'standard__component',
+                attributes: {
+                    componentName: 'inflooens__ClientListViewComponent',
+                },
+                state: {
+                    "inflooens__currentTabName": 'PreApprovalProcess1',
+                }
+            };
+            cmp.set("v.pageReference", pageReference);
+        }
+            else if(cmp.get("v.strStatus") == 'Pre-approved'){
+                var pageReference = {
+                    type: 'standard__component',
+                    attributes: {
+                        componentName: 'inflooens__ClientListViewComponent',
+                    },
+                    state: {
+                        "inflooens__currentTabName": 'PreApproved1',
+                    }
+                };
+                cmp.set("v.pageReference", pageReference);
+            }
+                else{
+                    var pageReference = {
+                        type: 'standard__component',
+                        attributes: {
+                            componentName: 'inflooens__LoanListViewComponent',
+                        },
+                        state: {
+                            "inflooens__currentTabName": cmp.get("v.strStatus")
+                        }
+                    };
+                    cmp.set("v.pageReference", pageReference);
+                }
+        //cmp.set("v.strUrl", url);
+        
+        helper.setColumns(cmp, event, helper);
+        
+        var strJson = cmp.get("v.strJson");
+        console.log('**JSON='+strJson);
+        /*'{"strChartType" : "funnel",'+
+                     ' "strStatus" : "Leads",'+
+                     ' "percentage" : 100,'+
+          			 ' "Value" : 100}';*/
+        
+        
+        
+        // this function call on the component load first time     
+        // get the page Number if it's not define, take 1 as default
+        
+        cmp.set("v.page",1)
+        cmp.set("v.recordsToDisplay",10) //Add At Server side Sorting time all refresh
+        cmp.set("v.sortField",'');
+        cmp.set("v.sortSerSidBy",'')
+        
+        var page = cmp.get("v.page") || 1;
+        // get the select option (drop-down) values.   
+        var recordToDisply = cmp.get("v.recordsToDisplay");
+        cmp.set("v.recordsFrom", 1);
+        cmp.set("v.recordsTo", 0 + cmp.get("v.recordsToDisplay"));
+        if(cmp.get("v.strStatus")=='Leads'||cmp.get("v.strStatus")=='Pre-Qualified'||cmp.get("v.strStatus")=='Pre-approved'){
+            var strStatus=cmp.get("v.strStatus");
+            helper.pagination(cmp, event, helper,strStatus, page, recordToDisply,'','');
+            //component.set("v.page",page)
+        }
+        else{
+            console.log('elsein inittable');
+            helper.extractData(cmp, event, helper, strJson, page, recordToDisply); 
+        }
+    },
+    // generic search
+    leadSearch: function(component, event, helper) {
+       var leadStr = event.target.value;
+                console.log('leadStr====', leadStr);
+       var target = event.getSource();
+        console.log('Target====', target);
+       var leadStr = target.get("v.value");      
+        console.log('leadStr====', leadStr);
+       component.set("v.searchStr", leadStr);
+       var strJson = component.get("v.strJson");
+       component.set("v.page",1)
+       component.set("v.recordsToDisplay",10) //Add At Server side Sorting time all refresh
+       component.set("v.sortField",'');
+       component.set("v.sortSerSidBy",'')
+       
+       var page = component.get("v.page") || 1;
+       // get the select option (drop-down) values.   
+       var recordToDisply = component.get("v.recordsToDisplay");
+       component.set("v.recordsFrom", 1);
+       component.set("v.recordsTo", 0 + component.get("v.recordsToDisplay"));
+       var strStatus=(component.get("v.strStatus"));
+       helper.pagination(component, event, helper, strStatus,page, recordToDisply,'','');
+       helper.extractData(component, event, helper, strJson, page, recordToDisply);
+       component.set("v.page",page)
+
+
+    },
+
+    handleClick: function(component, event, helper) {
+        const navService = component.find('navService');
+        const pageReference = component.get('v.pageReference');
+        const handleUrl = (url) => {
+            window.open(url);
+        };
+            const handleError = (error) => {
+            console.log(error);
+        };
+            navService.generateUrl(pageReference).then(handleUrl, handleError);
+        },
+
+
+        handlePageChange: function(cmp, event, helper){
+            console.log('**Page Change');   
+        },
+        pagination: function(cmp, event, helper){
+            cmp.set("v.page",1)
+            cmp.set("v.recordsToDisplay",10) //Add At Server side Sorting time all refresh
+            cmp.set("v.sortField",'');
+            cmp.set("v.sortSerSidBy",'')
+            
+            var page = cmp.get("v.page") || 1;
+            // get the select option (drop-down) values.   
+            var recordToDisply = cmp.get("v.recordsToDisplay");
+            cmp.set("v.recordsFrom", 1);
+            cmp.set("v.recordsTo", 0 + cmp.get("v.recordsToDisplay"));
+            var strStatus=(cmp.get("v.strStatus"));
+            helper.pagination(cmp, event, helper, strStatus,page, recordToDisply,'','');
+            cmp.set("v.page",page)
+        },
+            handleRowAction: function (cmp, event, helper) {
+                var action = event.getParam('action');
+                var row = event.getParam('row');
+                
+                switch (action.name) {
+                    case 'action2':
+                        break;            
+                }
+            },
+            
+            sortTable: function(component, event, helper) {
+                $('.sortColumn').removeClass('assignee-color');
+                $('.flag-header').removeClass('assignee-color');
+                event.currentTarget.classList.add('assignee-color');
+                var id = event.currentTarget.id;
+                var idArray = id.split('-');
+                var listName = idArray[0];
+                var tableHeader = idArray[1];
+                var tableHeaderIndex = idArray[2];
+                helper.sortBy(component, tableHeader, "v."+listName);
+                // helper.sortBy1(component, "columnAPIValues.inflooens__Loan_Type__c");
+                
+                
+            },      
+            
+            navigate: function(component, event, helper) {
+                // this function call on click on the previous page button  
+                var page = component.get("v.page") || 1                
+                // get the previous button label  
+                var direction = event.getSource().get("v.label");
+                // get the select option (drop-down) values.  
+                var recordToDisply = component.get("v.recordsToDisplay");
+                // set the current page,(using ternary operator.)  
+                page = direction === "Previous Page" ? (page - 1) : (page + 1);
+                // call the helper function
+                var strJson = component.get("v.strJson");
+                if(component.get("v.sortSerSidBy")=='ASC'||component.get("v.sortSerSidBy")=='DESC'){
+                    var col=component.get("v.sortField");
+                    var sortBy=component.get("v.sortSerSidBy");
+                    if(component.get("v.strStatus")=='Leads'||component.get("v.strStatus")=='Pre-Qualified'||component.get("v.strStatus")=='Pre-approved'|| component.get("v.strStatus")=='Nurture'){
+                        var strStatus=component.get("v.strStatus");
+                        helper.pagination(component, event, helper,strStatus, page, recordToDisply,col,sortBy);
+                        component.set("v.page",page)
+                    }
+                    else{
+                        helper.extractDataSort(component, event, helper, strJson, page, recordToDisply,col,sortBy);
+                    }
+                }
+                else{
+                    if(component.get("v.strStatus")=='Leads'||component.get("v.strStatus")=='Pre-Qualified'||component.get("v.strStatus")=='Pre-approved'||component.get("v.strStatus")=='Nurture'){
+                        var strStatus=component.get("v.strStatus");
+                        helper.pagination(component, event, helper,strStatus, page, recordToDisply,'','');
+                        component.set("v.page",page)
+                    }
+                    else{
+                        helper.extractData(component, event, helper, strJson, page, recordToDisply);
+                    }
+                }
+                if(direction === "Previous Page"){
+                    component.set("v.recordsFrom", component.get("v.recordsFrom") - component.get("v.recordsToDisplay"));
+                    if(component.get("v.recordsTo") == component.get("v.total")){
+                        component.set("v.recordsTo", (component.get("v.recordsFrom") + component.get("v.recordsToDisplay")) - 1);  
+                    } 
+                    else{
+                        component.set("v.recordsTo", component.get("v.recordsTo") - component.get("v.recordsToDisplay")); 
+                    }
+                    
+                }
+                else{
+                    component.set("v.recordsFrom", component.get("v.recordsFrom") + component.get("v.recordsToDisplay"));
+                    component.set("v.recordsTo", component.get("v.recordsTo") + component.get("v.recordsToDisplay"));  
+                    if(component.get("v.recordsTo") > component.get("v.total")){
+                        component.set("v.recordsTo", component.get("v.total"));  
+                    }          
+                }
+                console.log("records From=>",component.get('v.recordsFrom'));
+                console.log("recordsTo=>",component.get('v.recordsTo'));
+            },
+            // sortTable1: function(component, event, helper) {
+            //     $('.sortColumn').removeClass('assignee-color');
+            //     event.currentTarget.classList.add('assignee-color');
+            //     var id = event.target.id;
+            
+            //     var idArray = id.split('-');
+            //     var listName = idArray[0];
+            //     var tableHeader = idArray[1];
+            //     var tableHeaderIndex = idArray[2];
+            // 	var item = event.target.getAttribute("data-item");
+            //     component.set("v.sortDynamicColumn",id);
+            //     console.log("item");
+            //     console.log(item);
+            //     // var slides = document.getElementsByClassName("shortF");
+            //     // for (var i = 0; i < slides.length; i++) {
+            // 	// 	console.log(slides[i].id);
+            //     //    slides[i].classList.remove("show-shorting");
+            //     // }
+            //     // var el = document.getElementById(item);
+            //     // if(typeof(el) != "undefined"){
+            // 	// 	el.classList.add("show-shorting");        
+            //     // }
+            //     helper.sortBy(component, tableHeader, "v."+listName);
+            //   // helper.sortBy1(component, "columnAPIValues.inflooens__Loan_Type__c");
+            
+            // },
+            
+            openSearchBox: function(component, event, helper) {
+                $(document).ready(function () {
+                    $(document).click(function (e) {
+                        e.stopPropagation();
+                        $(".search-tasks-box").removeClass('active-search-box');
+                    });
+                })
+                $(".search-tasks-box").on("click", function(event) {  
+                    event.stopPropagation();
+                    $(".search-tasks-box").addClass('active-search-box');
+                });
+            },
+            
+            sortTableServer: function(component, event, helper) {
+               
+                var id = event.currentTarget.id;
+                component.set("v.page",1);
+                var strJson = component.get("v.strJson");
+                var page = component.get("v.page") || 1;
+                var recordToDisply = component.get("v.recordsToDisplay");
+                if(component.get("v.sortSerSidBy")=='ASC'&& component.get("v.sortField")==id){
+                    component.set("v.sortSerSidBy",'DESC');
+                    component.set("v.sortAsc",'false');
+                }
+                else{
+                    component.set("v.sortSerSidBy",'ASC');
+                    component.set("v.sortAsc",'True');
+                }
+                component.set("v.sortField",id);
+                var sortBy=component.get("v.sortSerSidBy");
+                component.set("v.recordsFrom", 1);
+                component.set("v.recordsTo", 0 + component.get("v.recordsToDisplay"));
+                if(component.get("v.strStatus")=='Leads'||component.get("v.strStatus")=='Pre-Qualified'||component.get("v.strStatus")=='Pre-approved'||component.get("v.strStatus")=='Nurture'){
+                    var strStatus=component.get("v.strStatus");
+                    helper.pagination(component, event, helper,strStatus, page, recordToDisply,id,sortBy);
+                    component.set("v.page",strStatus)
+                }
+                else{
+                    helper.extractDataSort(component, event, helper, strJson, page, recordToDisply,id,sortBy); 
+                }
+            },
+            Oldest: function(component, event, helper) {
+                component.set("v.sortField",'');
+                var records=component.get("v.total");
+                var page = ~~(records/10);
+                var pagelastrco=records%10;
+                if(pagelastrco>0){
+                    page=page+1;
+                }
+                var recordToDisply = component.get("v.recordsToDisplay");
+                var strJson = component.get("v.strJson");
+                if(component.get("v.strStatus")=='Leads'||component.get("v.strStatus")=='Pre-Qualified'||component.get("v.strStatus")=='Pre-approved'||component.get("v.strStatus")=='Nurture'){
+                    var strStatus=component.get("v.strStatus");
+                    helper.pagination(component, event, helper,strStatus, page, recordToDisply,'','');
+                    component.set("v.page",page)
+                }
+                else{
+                    helper.extractData(component, event, helper, strJson, page, recordToDisply); 
+                }
+                // helper.extractData(component, event, helper, strJson, page, recordToDisply);
+                component.set("v.recordsFrom",(page-1)*10+1 );
+                component.set("v.recordsTo",component.get("v.total"));
+            },
+            newest: function(component, event, helper) {
+                var a=component.get('c.initializeTable');
+                $A.enqueueAction(a);
+                
+            } ,
+
+            userFilterReset: function(component, event, helper) {
+                component.set("v.strStatus",'Leads');
+                helper.pagination(component, event, helper,'Leads', 1, 10,'','');
+               
+           } ,
+        })

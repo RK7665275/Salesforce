@@ -1,0 +1,296 @@
+({
+	setColumns : function(cmp, event, helper) {
+        var cols = [          
+                //{label: 'Action', type: 'button', initialWidth: 130, typeAttributes: { label: 'View Details', name: 'viewDetails', title: 'Get account details'}},
+                {label: 'Customer Name',  fieldName: 'AccountURL', type: 'url', typeAttributes: { label: {fieldName: 'ClientName'},target: '_self'}},
+                //{label: 'Phone', fieldName: 'Phone', type: 'text'},
+            	//{label: 'Email', fieldName: 'Email', type: 'text'},
+            	{label: 'Status',  fieldName: 'Status', type: 'text'},
+                //{label: 'Email', initialWidth: 120, fieldName: 'Email', type: 'text'},
+                //{label: 'Status', initialWidth: 100, fieldName: 'Status', type: 'text'},
+                {label: 'Last Update', fieldName: 'LastUpdate', type: 'text'},
+                {label: 'Action', type: 'button', initialWidth: 100, typeAttributes: { label: 'Action', name: 'action2', title: 'Click to Perform action'}},
+         ];
+            
+            
+        
+            /*
+             var cols = [          
+                //{label: 'Action', type: 'button', initialWidth: 130, typeAttributes: { label: 'View Details', name: 'viewDetails', title: 'Get account details'}},
+                {label: 'Account Name', fieldName: 'AccountURL', type: 'url', typeAttributes: { label: {fieldName: 'AccountName'},target: '_self'}},
+                //{label: 'Account Name', initialWidth: 140, fieldName: 'AccountName', type: 'text'},
+                {label: 'Address', fieldName: 'Address', type: 'text'},
+                {label: 'Customer#', initialWidth: 120, fieldName: 'Customer', type: 'text'},
+                {label: '# Attachments', initialWidth: 100, fieldName: 'Attachments', type: 'number'},
+                {label: 'Company Group', fieldName: 'CompanyGroup', type: 'text'},
+                {label: 'Has Environment', initialWidth: 100,fieldName: 'HasEnvironment', type: 'boolean'},
+                {label: '#Cases', initialWidth: 100,fieldName: 'Cases', type: 'number'},
+                {label: 'Product Family', fieldName: 'ProdFamily', type: 'text'},
+             	//{ type: 'action', typeAttributes: { rowActions: actions } }
+         ];
+         
+        if(strType=='Case'){
+            var caseAction = [
+            					{label: 'Action', type: 'button', initialWidth: 130, typeAttributes: { label: 'Create Case', name: 'action2', title: 'Click to create Case'}},
+        					 ];
+            cols = caseAction.concat(cols);    
+        }*/
+                
+        cmp.set('v.columns', cols);
+    },
+    extractData : function(cmp, event, helper, strJson, page, recordToDisply) {
+        cmp.set("v.isDataLoaded",'false');
+        var schrStr = cmp.get("v.searchStr");
+        console.log('schrstr in exdata'+schrStr);
+		var action = cmp.get('c.extractData');
+        action.setParams({
+            'strJson': strJson,
+            "pageNumber": page,
+            "recordToDisply": recordToDisply,
+            "schStr": schrStr,
+            "userFilter":cmp.get("v.viewBy")
+        });
+        
+        action.setCallback(this, function(response) {
+            var state = response.getState();
+            var cdData = response.getReturnValue();
+            console.log('#DATAINMILES#'+JSON.stringify(cdData));
+
+            console.log('***State='+state);
+            if (state === "SUCCESS") {
+            	
+            	if(response.getReturnValue() && response.getReturnValue().loanWrapList)
+				accountData = response.getReturnValue().loanWrapList;  
+                console.log('#accountData#'+JSON.stringify(accountData) + '###>' +accountData.length);   
+                       
+                if(accountData.length > 0) {
+                    console.log('#inside#'+JSON.stringify(accountData) + '###>' +accountData.length); 
+                    var accountData;
+           			 if(response.getReturnValue()){
+                    	cmp.set("v.acctList", response.getReturnValue().loanWrapList);
+                        cmp.set("v.page", response.getReturnValue().page);
+            			cmp.set("v.total", response.getReturnValue().total);
+            			cmp.set("v.pages", Math.ceil(response.getReturnValue().total / recordToDisply));
+                        cmp.set("v.isDataLoaded",'true');
+            		}
+            		
+                    if(cmp.get("v.recordsTo") > cmp.get("v.total")){
+                    	cmp.set("v.recordsTo", cmp.get("v.total"));  
+                    }
+                    if(cmp.get("v.strFlag")){
+                        var optsFlaggedData = [];
+                        var optsNonFlaggedData = [];
+                        var currdata = cmp.get("v.acctList");
+                        cmp.set("v.acctList", null);
+                        for(var i = 0; i < currdata.length; i++){
+                            if(cmp.get("v.strFlag") == currdata[i].flag){
+                                optsFlaggedData.push(currdata[i]);
+                            }
+                            else{
+                                optsNonFlaggedData.push(currdata[i]);
+                            }
+                        }
+                        var finalData = optsFlaggedData.concat(optsNonFlaggedData);
+                        cmp.set("v.acctList", finalData);
+                    }
+                    if(response.getReturnValue()){
+                        
+                        var cols = cmp.get("v.acctList")[0].columnNames;
+                        try {
+                            for(var i=0 ; i<accountData.length ; i++) {
+                                var colApiNames = accountData[i].columnAPINames;
+                                var colApiValues = accountData[i].columnAPIValues;
+                                for(var j=0 ; j < cols.length ; j++) {
+                                    accountData[i][colApiNames[j].replaceAll(/\s/g,'')] = colApiValues[j];
+                                }
+                            }
+                            cmp.set("v.acctList",accountData);
+                        } catch(e) {
+                            console.log("error=>",e);
+                        }
+                        var colApiNames = accountData[0].columnAPINames;
+                        var colApiValues = accountData[0].columnAPIValues;
+                        var arr = [];
+                        for(var i=0 ; i < cols.length ; i++) {
+                            var obj = {};
+                            obj.Name = cols[i];
+                            obj.apiName = colApiNames[i].replaceAll(/\s/g,'');
+                            arr.push(obj);
+                        }
+                        cmp.set("v.columns", arr);
+                    }
+                    cmp.set("v.totalRecords", response.getReturnValue().total);
+                    cmp.set("v.currentPage", 1);
+                    //cmp.set("v.spinner",false);
+                    console.log('***'+accountData.length);
+                   // console.log('***#'+response.getReturnValue()[0].columnAPIValues);
+                }else{
+                    cmp.set("v.acctList", response.getReturnValue().loanWrapList);  
+                }
+              //  cmp.set("v.searchStr",'');
+            }
+
+        });
+         $A.enqueueAction(action);
+	},
+        sortBy: function(component, field, list) {
+        var sortAsc = component.get("v.sortAsc"),
+            sortField = component.get("v.sortField");
+         var records =component.get(list);
+        
+        sortAsc = sortField != field || !sortAsc;
+         
+        records.sort(function(a,b){
+            var t1 = a[field] == b[field],
+                t2 = (!a[field] && b[field]) || (a[field] < b[field]);
+            return t1? 0: (sortAsc?-1:1)*(t2?1:-1);
+            
+        });
+        
+        component.set("v.sortAsc", sortAsc);
+        component.set("v.sortField", field);
+        component.set(list, records);
+        // console.log("record List field");       	
+        // console.log(records);
+         this.renderPage(component);
+     },
+      extractDataSort : function(cmp, event, helper, strJson, page, recordToDisply,column,sortBy) {
+        cmp.set("v.isDataLoaded",'false');
+		var action = cmp.get('c.extractDataSort');
+        action.setParams({
+            'strJson': strJson,
+            "pageNumber": page,
+            "recordToDisply": recordToDisply,
+            "SortColumnName":column,
+            "sortBy":sortBy,
+            "userFilter":cmp.get("v.viewBy")
+        });
+        
+        action.setCallback(this, function(response) {
+            var state = response.getState();
+            console.log('***State='+state);
+            if (state === "SUCCESS") {
+            	
+            	if(response.getReturnValue() && response.getReturnValue().loanWrapList)
+				accountData = response.getReturnValue().loanWrapList;                
+                if(accountData.length > 0) {
+                    
+                    var accountData;
+           			 if(response.getReturnValue()){
+                    	cmp.set("v.acctList", response.getReturnValue().loanWrapList);
+                        cmp.set("v.page", response.getReturnValue().page);
+            			cmp.set("v.total", response.getReturnValue().total);
+            			cmp.set("v.pages", Math.ceil(response.getReturnValue().total / recordToDisply));
+                        cmp.set("v.isDataLoaded",'true');
+            		}
+            		
+                    if(cmp.get("v.recordsTo") > cmp.get("v.total")){
+                    	cmp.set("v.recordsTo", cmp.get("v.total"));  
+                    }
+                    if(cmp.get("v.strFlag")){
+                        var optsFlaggedData = [];
+                        var optsNonFlaggedData = [];
+                        var currdata = cmp.get("v.acctList");
+                        cmp.set("v.acctList", null);
+                        for(var i = 0; i < currdata.length; i++){
+                            if(cmp.get("v.strFlag") == currdata[i].flag){
+                                optsFlaggedData.push(currdata[i]);
+                            }
+                            else{
+                                optsNonFlaggedData.push(currdata[i]);
+                            }
+                        }
+                        var finalData = optsFlaggedData.concat(optsNonFlaggedData);
+                        cmp.set("v.acctList", finalData);
+                    }
+                    if(response.getReturnValue()){
+                        
+                        var cols = cmp.get("v.acctList")[0].columnNames;
+                        try {
+                            for(var i=0 ; i<accountData.length ; i++) {
+                                var colApiNames = accountData[i].columnAPINames;
+                                var colApiValues = accountData[i].columnAPIValues;
+                                for(var j=0 ; j < cols.length ; j++) {
+                                    accountData[i][colApiNames[j].replaceAll(/\s/g,'')] = colApiValues[j];
+                                }
+                            }
+                            cmp.set("v.acctList",accountData);
+                        } catch(e) {
+                            console.log("error=>",e);
+                        }
+                        var colApiNames = accountData[0].columnAPINames;
+                        var colApiValues = accountData[0].columnAPIValues;
+                        var arr = [];
+                        for(var i=0 ; i < cols.length ; i++) {
+                            var obj = {};
+                            obj.Name = cols[i];
+                            obj.apiName = colApiNames[i].replaceAll(/\s/g,'');
+                            arr.push(obj);
+                        }
+                        cmp.set("v.columns", arr);
+                    }
+                    cmp.set("v.totalRecords", response.getReturnValue().total);
+                    cmp.set("v.currentPage", 1);
+                    //cmp.set("v.spinner",false);
+                    console.log('***'+accountData.length);
+                   // console.log('***#'+response.getReturnValue()[0].columnAPIValues);
+                }
+                
+            }
+        });
+         $A.enqueueAction(action);
+	},
+     pagination: function(cmp, event, helper,strStatus,page, recordToDisply,SortColumnNam,sortBy){
+        cmp.set("v.isDataLoaded",'false');
+        console.log('#SEARCHSTR#'+cmp.get("v.searchStr"));
+        console.log('#strStatus#'+strStatus);
+        var schrStr = cmp.get("v.searchStr");
+        var action=cmp.get("c.extractLead");
+        console.log('#action#'+action);
+        action.setParams({           
+             strStatus : strStatus,
+            "pageNumber": page,
+            "recordToDisply": recordToDisply,
+            SortColumnName:SortColumnNam,
+             SortBy:sortBy,
+             "schStr": schrStr,
+             "userFilter":cmp.get("v.viewBy")
+        });
+        action.setCallback(this,function(response){ 
+            if(response.getState()==='SUCCESS'){ 
+                var chartData = response.getReturnValue();
+                console.log('#DATAFTER#'+JSON.stringify(chartData));
+                var topNumber = 0;
+                cmp.set("v.accData", chartData.accList);
+                cmp.set("v.isDataLoaded",'true');
+                cmp.set("v.preApprovalProcessData",chartData.accList);
+                cmp.set("v.preApprovedData",chartData.accList)
+                cmp.set("v.NurtureData",chartData.accList)
+                cmp.set("v.total",0)
+                cmp.set("v.total", chartData.y);
+                cmp.set("v.totalRecords",0)
+                cmp.set("v.totalRecords", chartData.y);
+                if(response.getReturnValue().label == 'Leads'){
+                cmp.set("v.redTask",chartData.red)
+                cmp.set("v.yellowTask", chartData.yellow);
+                cmp.set("v.greenTask", chartData.green);
+                }
+                if(response.getReturnValue().label == 'Nurture'){
+                cmp.set("v.redTask",chartData.red)
+                cmp.set("v.yellowTask", chartData.yellow);
+                cmp.set("v.greenTask", chartData.green);
+                }
+                cmp.set("v.pages", Math.ceil(chartData.y / recordToDisply));
+                if(cmp.get("v.recordsTo") > cmp.get("v.total")){
+                    	cmp.set("v.recordsTo", cmp.get("v.total"));  
+                    }
+                   // cmp.set("v.searchStr",'');
+            }
+            else{
+                //alert('Error')
+            }
+        });
+    
+        $A.enqueueAction(action);
+    },
+})

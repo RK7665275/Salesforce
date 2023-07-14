@@ -1,0 +1,1550 @@
+<aura:component controller="LightningTableApexController" implements="flexipage:availableForAllPageTypes,force:lightningQuickAction,lightning:isUrlAddressable" access="global" >
+    <aura:attribute name="pageReference" type="Object"/>
+    <ltng:require scripts="{!$Resource.jquery331min}" afterScriptsLoaded="{!c.openSearchBox}"/>
+    <ltng:require styles="{!$Resource.CommonStyleAppSetup}"/>
+    <lightning:navigation aura:id="navService"/>
+    <aura:attribute name="url" type="String"/>                
+    <aura:attribute access="global" type="List" name="acctList"/>
+    <aura:attribute access="global" name="columns" type="List"/>
+    <aura:attribute access="global" name="strJson" type="String"/>
+    <aura:attribute access="global" name="strUrl" type="String"/>
+    <aura:attribute access="global" name="strStatus" type="String" default="Leads"/>
+    <aura:attribute access="global" name="strDuration" type="String" default="All"/>
+    <aura:attribute access="global" type="Account[]" name="accData"/>
+    <aura:attribute access="global" type="Account[]" name="preApprovalProcessData"/>
+    <aura:attribute access="global" type="Account[]" name="preApprovedData"/>
+    <aura:attribute access="global" name="totalRecords" type="Integer" default="0"/>
+    <aura:attribute access="global" name="currentPage" type="Integer"/>
+    <aura:attribute access="global" type="Account[]" name="NurtureData"/>
+    <aura:attribute access="global" name="isFullScreen" type="boolean" default="false"/>
+    <aura:attribute access="global" type="Boolean" name="sortAsc" />
+    <aura:attribute access="global" type="String" name="sortField" />
+    <aura:attribute access="global" type="String" name="sortFieldD" />
+    <aura:attribute access="global" name="sortColumn" type="String" />
+    <aura:attribute access="global" type="String" name="sortDynamicColumn" />
+    <aura:attribute access="global" type="String" name="strFlag" default="Green"/>
+    <aura:attribute access="global" type="Boolean" name="isDataLoaded" />
+    <aura:attribute access="global" type="String" name="sortSerSidBy"/>
+
+    <aura:attribute access="global" name="searchStr" type="string"/>
+    
+    <aura:attribute access="global" type="String" name="greenTask"/>
+    <aura:attribute access="global" type="String" name="yellowTask"/>
+    <aura:attribute access="global" type="String" name="redTask"/>
+    <!--<aura:handler name="init" value="{! this }" action="{! c.initializeTable }"/>-->
+    <aura:handler name="pageEvent" event="c:LightningPaginatorEvent" action="{!c.handlePageChange}"/>
+    
+    <aura:handler name="init" value="{!this}" action="{!c.pagination }"/>
+    <aura:method name="pagination"  action="{!c.pagination }"/>
+    <aura:method name="setTableData" action="{!c.initializeTable}" />
+    <aura:method name="UserFilter" action="{!c.userFilterReset}" />
+    
+    <!-- For pagination-->
+    <aura:attribute access="global" name="page" type="integer" description="using for store page Number"/>
+    <aura:attribute access="global" name="recordsToDisplay" type="integer" description="records" default="10"/>
+    <aura:attribute access="global" name="recordsFrom" type="integer" description="records"/>
+    <aura:attribute access="global" name="recordsTo" type="integer" description="records"/>
+    <aura:attribute access="global" name="pages" type="integer" description="using for store All Pages page Number"/>
+    <aura:attribute access="global" name="total" type="integer" description="total records count store "/>
+    <aura:attribute access="global" name="viewBy" type="String" Default="My Own"/>
+    <aura:if isTrue="{!!v.isFullScreen}">
+        <div class="slds-grid slds-gutters slds-m-left_none slds-m-right_none align-center">
+            <div class="slds-col slds-size_4-of-12">
+                <h2 class="font-bold"><small class="font-light">
+                    {!v.strStatus}:</small>&nbsp;
+                    <!--aura:if isTrue="{!v.strStatus != 'Leads'}">
+                        <aura:if isTrue="{!v.strStatus != 'Pre-approval in Process'}">
+                            <aura:if isTrue="{!v.strStatus != 'Pre-approved'}">
+                                {!v.totalRecords}
+                            </aura:if>
+                        </aura:if>
+                    </aura:if-->
+                    <!--aura:if isTrue="{!v.strStatus == 'Leads'}">
+                        {v.total}
+                    </aura:if>
+                    <aura:if isTrue="{!v.strStatus == 'Pre-approval in Process'}">
+                        {v.total}
+                    </aura:if>
+                    <aura:if isTrue="{!v.strStatus == 'Pre-approved'}">
+                        {v.total}
+                    </aura:if-->
+                    {!v.totalRecords}
+                </h2>
+            </div>  
+            <div class="slds-col slds-size_6-of-12 slds-p-left_none slds-p-right_none count-sec">
+                <div class="d-flex-center">
+                    <div class="">
+                        <span class="resp-w100">At Risk</span>
+                        <span class="leadsCount leadsRed">{!v.redTask}</span>
+                    </div>
+                    <div class="">
+                        <span class="resp-w100">Requires Attention</span>
+                        <span class="leadsCount leadsAmber">{!v.yellowTask}</span>
+                    </div>
+                    <div class="">
+                        <span class="resp-w100">On Track</span>
+                        <span class="leadsCount leadsGreen">{!v.greenTask}</span>
+                    </div>
+                </div>
+            </div>
+            <div class="slds-col slds-size_1-of-12 slds-p-left_none slds-text-align_right">
+                <!-- <a href="" onclick="{!c.openSearchBox}"> -->
+                <div class="searchBox workSearchBox slds-m-left_none search-tasks-box searchTask resp-w100">
+                    <lightning:input class="search-box slds-p-right_x-small slds-lookup__search-input slds-input leftPaddingClass searchProperty workInputSearch searchTask focus-search" value="{!v.searchStr}"  onchange="{!c.leadSearch}" placeholder="Search"/>
+                    <div class="searchTask cursor-pointer srch-pos"> 
+                        <i class="material-icons gray-icon searchTask">search</i>
+                    </div>
+                </div>
+                <!-- <div class="searchTask cursor-pointer srch-pos"> 
+                        <i class="material-icons gray-icon searchTask">search</i> 
+                    </div> -->
+                <!-- </a> -->
+            </div> 
+            <div class="slds-col slds-size_1-of-12 slds-p-left_none slds-text-align_right">               
+                <div class="btn-add-more viewMore">
+                    <a href="" target="_blank" onclick="{!c.handleClick}">
+                        <div class="iconImg gray-icon">
+                            <i class="material-icons">open_in_new</i>
+                        </div>
+                    </a>
+                    <!--<lightning:icon onclick="{!c.handleClick}" iconName="utility:new_window" alternativeText="Open in New Window" style="margin-right:5px;"/>-->
+                </div>
+            </div>
+        </div>
+        <div class="clearfix"></div>
+        
+        <!--<div class="slds-grid slds-card">
+            <div class="slds-col slds-size_2-of-3">  
+                
+            </div>
+            <div class="slds-col slds-size_1-of-3 slds-text-align_right">
+      
+                <div class="btn-add-more">
+                    <a href="{!v.strUrl}" target="_blank">
+                        <div class="iconImg gray-icon" data-aura-rendered-by="1556:0">
+                            <i class="material-icons" data-aura-rendered-by="1557:0">open_in_new</i>
+                        </div>
+      
+                        <lightning:icon iconName="utility:new_window" alternativeText="Open in New Window" style="margin-right:5px;"/>
+                    </a>  
+                </div>
+            </div>
+        </div>-->
+        <div class="slds-scrollable slds-table-cust cust-table text-capitalize tbl-with-blur">    
+            <!--<div class="slds-scrollable slds-table-cust cust-table  " style="height:356px;">    
+        <lightning:datatable data="{! v.acctList }"
+                         columns="{! v.columns }"
+                         keyField="id"
+                         hideCheckboxColumn="true"
+                         onrowaction="{! c.handleRowAction }"
+                         />
+        -->
+            <aura:if isTrue="{!v.isDataLoaded == 'false'}">
+                <div class="">
+                    <lightning:spinner  variant="brand" alternativeText="Loading" size="" />
+                </div>
+            </aura:if>
+            <div class="slds-grid-table small slds-form-element__group " >
+                <div class="slds-form-element__row slds-grid slds-wrap table-heading header small-padding-left funnel-table">
+                    <aura:if isTrue="{!v.strStatus == 'Leads'}">
+                        <!-- <div class="slds-col slds-form-element add-width  slds-size_1-of-12 slds-medium-size_1-of-12 slds-large-size_1-of-12 "></div> -->
+                     
+                        <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_3-of-12 slds-large-size_3-of-12 pl-32 ">
+                            <div class="flag-header sortColumn" onclick="{!c.sortTableServer}" id="Lead_Priority__c"> 
+                                <span class="hover-tooltip d-flex align-items-center">
+                                    <i class="material-icons">flag</i>	
+                                    <aura:if isTrue="{!v.sortField=='Lead_Priority__c'}">
+                                        <aura:if isTrue="{!v.sortAsc}">
+                                            <i class="fas fa-arrow-up fa-sm assignee-color"></i>
+                                            <span class="tooltip-text" style="left: 40px;">Sorted A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                            <aura:set attribute="else">
+                                                <i class="fas fa-arrow-down fa-sm assignee-color"></i>
+                                                <span class="tooltip-text" style="left: 40px;">Sorted Z <i class="fas fa-long-arrow-alt-right"></i> A</span>
+                                            </aura:set>
+                                        </aura:if>
+                                        <aura:set attribute="else">
+                                            <i class="fas fa-arrow-down fa-sm sortIcon"></i>
+                                            <span class="tooltip-text left-100">Sort A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                        </aura:set>
+                                    </aura:if>
+                                </span>
+                            </div>
+                            <span class="hover-tooltip d-flex-gap-5 sortColumn" onclick="{!c.sortTableServer}" id="FirstName">
+                                <div class="slds-truncate">Client Name</div>
+                                <aura:if isTrue="{!v.sortField=='FirstName'}">
+                                    <aura:if isTrue="{!v.sortAsc}">
+                                        <i class="fas fa-arrow-up fa-sm assignee-color"></i>
+                                        <span class="tooltip-text">Client Name <span class="middle-dot"></span> Sorted A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                        <aura:set attribute="else">
+                                            <i class="fas fa-arrow-down fa-sm assignee-color"></i>
+                                            <span class="tooltip-text">Client Name <span class="middle-dot"></span> Sorted Z <i class="fas fa-long-arrow-alt-right"></i> A</span>
+                                        </aura:set>
+                                    </aura:if>
+                                    <aura:set attribute="else">
+                                        <i class="fas fa-arrow-down fa-sm sortIcon"></i>
+                                        <span class="tooltip-text">Client Name <span class="middle-dot"></span> Sort A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                    </aura:set>
+                                </aura:if>
+                            </span>
+                        </div>
+                        <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_2-of-12 slds-large-size_2-of-12 sortColumn" onclick="{!c.sortTableServer}" id="inflooens__Loan_Type__c">
+                            <span class="hover-tooltip d-flex-gap-5">
+                                <div class="slds-truncate">Loan Type</div>
+                                <aura:if isTrue="{!v.sortField=='inflooens__Loan_Type__c'}">
+                                    <aura:if isTrue="{!v.sortAsc}">
+                                        <i class="fas fa-arrow-up fa-sm assignee-color"></i>
+                                        <span class="tooltip-text">Loan Type <span class="middle-dot"></span> Sorted A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                        <aura:set attribute="else">
+                                            <i class="fas fa-arrow-down fa-sm assignee-color"></i>
+                                            <span class="tooltip-text">Loan Type <span class="middle-dot"></span> Sorted Z <i class="fas fa-long-arrow-alt-right"></i> A</span>
+                                        </aura:set>
+                                    </aura:if>
+                                    <aura:set attribute="else">
+                                        <i class="fas fa-arrow-down fa-sm sortIcon"></i>
+                                        <span class="tooltip-text">Loan Type <span class="middle-dot"></span> Sort A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                    </aura:set>
+                                </aura:if>
+                            </span>
+                            <!-- Loan Type
+                            <aura:if isTrue="{!v.sortField=='inflooens__Loan_Type__c'}">
+                                <aura:if isTrue="{!v.sortAsc}">
+                                    <i class="fas fa-arrow-up fa-sm assignee-color"></i>
+                                    <aura:set attribute="else">
+                                        <i class="fas fa-arrow-down fa-sm assignee-color"></i>
+                                    </aura:set>
+                                </aura:if>
+                                <aura:set attribute="else">
+                                    <aura:if isTrue="{!v.sortAsc}">
+                                        <i class="fas fa-arrow-down fa-sm sortIcon"></i>
+                                        <aura:set attribute="else">
+                                            <i class="fas fa-arrow-up fa-sm sortIcon"></i>
+                                        </aura:set>
+                                    </aura:if>
+                                </aura:set>
+                            </aura:if> -->
+                        </div>
+                        <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_2-of-12 slds-large-size_2-of-12 sortColumn" onclick="{!c.sortTableServer}" id="AccountSource">
+                            <span class="hover-tooltip d-flex-gap-5">
+                                <div class="slds-truncate">Source</div>
+                                <aura:if isTrue="{!v.sortField=='AccountSource'}">
+                                    <aura:if isTrue="{!v.sortAsc}">
+                                        <i class="fas fa-arrow-up fa-sm assignee-color"></i>
+                                        <span class="tooltip-text">Source <span class="middle-dot"></span> Sorted A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                        <aura:set attribute="else">
+                                            <i class="fas fa-arrow-down fa-sm assignee-color"></i>
+                                            <span class="tooltip-text">Source <span class="middle-dot"></span> Sorted Z <i class="fas fa-long-arrow-alt-right"></i> A</span>
+                                        </aura:set>
+                                    </aura:if>
+                                    <aura:set attribute="else">
+                                        <i class="fas fa-arrow-down fa-sm sortIcon"></i>
+                                        <span class="tooltip-text">Source <span class="middle-dot"></span> Sort A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                    </aura:set>
+                                </aura:if>
+                            </span>
+                            <!-- Source
+                            <aura:if isTrue="{!v.sortField=='AccountSource'}">
+                                <aura:if isTrue="{!v.sortAsc}">
+                                    <i class="fas fa-arrow-up fa-sm assignee-color"></i>
+                                    <aura:set attribute="else">
+                                        <i class="fas fa-arrow-down fa-sm assignee-color"></i>
+                                    </aura:set>
+                                </aura:if>
+                                <aura:set attribute="else">
+                                    <aura:if isTrue="{!v.sortAsc}">
+                                        <i class="fas fa-arrow-down fa-sm sortIcon"></i>
+                                        <aura:set attribute="else">
+                                            <i class="fas fa-arrow-up fa-sm sortIcon"></i>
+                                        </aura:set>
+                                    </aura:if>
+                                </aura:set>
+                            </aura:if> -->
+                        </div>
+                        <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_2-of-12 slds-large-size_2-of-12 sortColumn" onclick="{!c.sortTableServer}" id="inflooens__Referred_By__c">
+                            <span class="hover-tooltip d-flex-gap-5">
+                                <div class="slds-truncate">Referred By</div>
+                                <aura:if isTrue="{!v.sortField=='inflooens__Referred_By__c'}">
+                                    <aura:if isTrue="{!v.sortAsc}">
+                                        <i class="fas fa-arrow-up fa-sm assignee-color"></i>
+                                        <span class="tooltip-text">Referred By <span class="middle-dot"></span> Sorted A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                        <aura:set attribute="else">
+                                            <i class="fas fa-arrow-down fa-sm assignee-color"></i>
+                                            <span class="tooltip-text">Referred By <span class="middle-dot"></span> Sorted Z <i class="fas fa-long-arrow-alt-right"></i> A</span>
+                                        </aura:set>
+                                    </aura:if>
+                                    <aura:set attribute="else">
+                                        <i class="fas fa-arrow-down fa-sm sortIcon"></i>
+                                        <span class="tooltip-text">Referred By <span class="middle-dot"></span> Sort A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                    </aura:set>
+                                </aura:if>
+                            </span>
+                            <!-- Referred By
+                            <aura:if isTrue="{!v.sortField=='inflooens__Referred_By__c'}">
+                                <aura:if isTrue="{!v.sortAsc}">
+                                    <i class="fas fa-arrow-up fa-sm assignee-color"></i>
+                                    <aura:set attribute="else">
+                                        <i class="fas fa-arrow-down fa-sm assignee-color"></i>
+                                    </aura:set>
+                                </aura:if>
+                                <aura:set attribute="else">
+                                    <aura:if isTrue="{!v.sortAsc}">
+                                        <i class="fas fa-arrow-down fa-sm sortIcon"></i>
+                                        <aura:set attribute="else">
+                                            <i class="fas fa-arrow-up fa-sm sortIcon"></i>
+                                        </aura:set>
+                                    </aura:if>
+                                </aura:set>
+                            </aura:if> -->
+                        </div>
+                        <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_2-of-12 slds-large-size_2-of-12 sortColumn" onclick="{!c.sortTableServer}" id="inflooens__CustomerPriority__c">
+                            <span class="hover-tooltip d-flex-gap-5">
+                                <div class="slds-truncate">Priority</div>
+                                <aura:if isTrue="{!v.sortField=='inflooens__CustomerPriority__c'}">
+                                    <aura:if isTrue="{!v.sortAsc}">
+                                        <i class="fas fa-arrow-up fa-sm assignee-color"></i>
+                                        <span class="tooltip-text">Priority <span class="middle-dot"></span> Sorted A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                        <aura:set attribute="else">
+                                            <i class="fas fa-arrow-down fa-sm assignee-color"></i>
+                                            <span class="tooltip-text">Priority <span class="middle-dot"></span> Sorted Z <i class="fas fa-long-arrow-alt-right"></i> A</span>
+                                        </aura:set>
+                                    </aura:if>
+                                    
+                                    <aura:set attribute="else">
+                                        <i class="fas fa-arrow-down fa-sm sortIcon"></i>
+                                        <span class="tooltip-text">Priority <span class="middle-dot"></span> Sort A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                    </aura:set>
+                                </aura:if>
+                            </span>
+                            <!-- Priority
+                            <aura:if isTrue="{!v.sortField=='inflooens__CustomerPriority__c'}">
+                                <aura:if isTrue="{!v.sortAsc}">
+                                    <i class="fas fa-arrow-up fa-sm assignee-color"></i>
+                                    <aura:set attribute="else">
+                                        <i class="fas fa-arrow-down fa-sm assignee-color"></i>
+                                    </aura:set>
+                                </aura:if>
+                                <aura:set attribute="else">
+                                    <aura:if isTrue="{!v.sortAsc}">
+                                        <i class="fas fa-arrow-down fa-sm sortIcon"></i>
+                                        <aura:set attribute="else">
+                                            <i class="fas fa-arrow-up fa-sm sortIcon"></i>
+                                        </aura:set>
+                                    </aura:if>
+                                </aura:set>
+                            </aura:if> -->
+                        </div>
+                        <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_1-of-12 slds-large-size_1-of-12">Action</div>
+                    </aura:if>
+
+                    <!--  Nurture State   BM-->
+
+                    <aura:if isTrue="{!v.strStatus == 'Nurture'}">
+                        <!-- <div class="slds-col slds-form-element add-width  slds-size_1-of-12 slds-medium-size_1-of-12 slds-large-size_1-of-12 "></div> -->
+                    
+                        <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_3-of-12 slds-large-size_3-of-12 pl-32 ">
+                            <div class="flag-header sortColumn" onclick="{!c.sortTableServer}" id="Lead_Priority__c"> 
+                                <span class="hover-tooltip d-flex align-items-center">
+                                    <i class="material-icons">flag</i>  
+                                    <aura:if isTrue="{!v.sortField=='Lead_Priority__c'}">
+                                        <aura:if isTrue="{!v.sortAsc}">
+                                            <i class="fas fa-arrow-up fa-sm assignee-color"></i>
+                                            <span class="tooltip-text" style="left: 40px;">Sorted A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                            <aura:set attribute="else">
+                                                <i class="fas fa-arrow-down fa-sm assignee-color"></i>
+                                                <span class="tooltip-text" style="left: 40px;">Sorted Z <i class="fas fa-long-arrow-alt-right"></i> A</span>
+                                            </aura:set>
+                                        </aura:if>
+                                        <aura:set attribute="else">
+                                            <i class="fas fa-arrow-down fa-sm sortIcon"></i>
+                                            <span class="tooltip-text left-100">Sort A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                        </aura:set>
+                                    </aura:if>
+                                </span>
+                            </div>
+                            <span class="hover-tooltip d-flex-gap-5 sortColumn" onclick="{!c.sortTableServer}" id="FirstName">
+                                <div class="slds-truncate">Client Name</div>
+                                <aura:if isTrue="{!v.sortField=='FirstName'}">
+                                    <aura:if isTrue="{!v.sortAsc}">
+                                        <i class="fas fa-arrow-up fa-sm assignee-color"></i>
+                                        <span class="tooltip-text">Client Name <span class="middle-dot"></span> Sorted A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                        <aura:set attribute="else">
+                                            <i class="fas fa-arrow-down fa-sm assignee-color"></i>
+                                            <span class="tooltip-text">Client Name <span class="middle-dot"></span> Sorted Z <i class="fas fa-long-arrow-alt-right"></i> A</span>
+                                        </aura:set>
+                                    </aura:if>
+                                    <aura:set attribute="else">
+                                        <i class="fas fa-arrow-down fa-sm sortIcon"></i>
+                                        <span class="tooltip-text">Client Name <span class="middle-dot"></span> Sort A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                    </aura:set>
+                                </aura:if>
+                            </span>
+                        </div>
+                        <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_2-of-12 slds-large-size_2-of-12 sortColumn" onclick="{!c.sortTableServer}" id="inflooens__Loan_Type__c">
+                            <span class="hover-tooltip d-flex-gap-5">
+                                <div class="slds-truncate">Loan Type</div>
+                                <aura:if isTrue="{!v.sortField=='inflooens__Loan_Type__c'}">
+                                    <aura:if isTrue="{!v.sortAsc}">
+                                        <i class="fas fa-arrow-up fa-sm assignee-color"></i>
+                                        <span class="tooltip-text">Loan Type <span class="middle-dot"></span> Sorted A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                        <aura:set attribute="else">
+                                            <i class="fas fa-arrow-down fa-sm assignee-color"></i>
+                                            <span class="tooltip-text">Loan Type <span class="middle-dot"></span> Sorted Z <i class="fas fa-long-arrow-alt-right"></i> A</span>
+                                        </aura:set>
+                                    </aura:if>
+                                    <aura:set attribute="else">
+                                        <i class="fas fa-arrow-down fa-sm sortIcon"></i>
+                                        <span class="tooltip-text">Loan Type <span class="middle-dot"></span> Sort A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                    </aura:set>
+                                </aura:if>
+                            </span>
+                        
+                        </div>
+                        <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_2-of-12 slds-large-size_2-of-12 sortColumn" onclick="{!c.sortTableServer}" id="AccountSource">
+                            <span class="hover-tooltip d-flex-gap-5">
+                                <div class="slds-truncate">Source</div>
+                                <aura:if isTrue="{!v.sortField=='AccountSource'}">
+                                    <aura:if isTrue="{!v.sortAsc}">
+                                        <i class="fas fa-arrow-up fa-sm assignee-color"></i>
+                                        <span class="tooltip-text">Source <span class="middle-dot"></span> Sorted A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                        <aura:set attribute="else">
+                                            <i class="fas fa-arrow-down fa-sm assignee-color"></i>
+                                            <span class="tooltip-text">Source <span class="middle-dot"></span> Sorted Z <i class="fas fa-long-arrow-alt-right"></i> A</span>
+                                        </aura:set>
+                                    </aura:if>
+                                    <aura:set attribute="else">
+                                        <i class="fas fa-arrow-down fa-sm sortIcon"></i>
+                                        <span class="tooltip-text">Source <span class="middle-dot"></span> Sort A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                    </aura:set>
+                                </aura:if>
+                            </span>
+                        
+                        </div>
+                        <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_2-of-12 slds-large-size_2-of-12 sortColumn" onclick="{!c.sortTableServer}" id="inflooens__Referred_By__c">
+                            <span class="hover-tooltip d-flex-gap-5">
+                                <div class="slds-truncate">Referred By</div>
+                                <aura:if isTrue="{!v.sortField=='inflooens__Referred_By__c'}">
+                                    <aura:if isTrue="{!v.sortAsc}">
+                                        <i class="fas fa-arrow-up fa-sm assignee-color"></i>
+                                        <span class="tooltip-text">Referred By <span class="middle-dot"></span> Sorted A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                        <aura:set attribute="else">
+                                            <i class="fas fa-arrow-down fa-sm assignee-color"></i>
+                                            <span class="tooltip-text">Referred By <span class="middle-dot"></span> Sorted Z <i class="fas fa-long-arrow-alt-right"></i> A</span>
+                                        </aura:set>
+                                    </aura:if>
+                                    <aura:set attribute="else">
+                                        <i class="fas fa-arrow-down fa-sm sortIcon"></i>
+                                        <span class="tooltip-text">Referred By <span class="middle-dot"></span> Sort A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                    </aura:set>
+                                </aura:if>
+                            </span>
+                        
+                        </div>
+                        <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_2-of-12 slds-large-size_2-of-12 sortColumn" onclick="{!c.sortTableServer}" id="inflooens__CustomerPriority__c">
+                            <span class="hover-tooltip d-flex-gap-5">
+                                <div class="slds-truncate">Priority</div>
+                                <aura:if isTrue="{!v.sortField=='inflooens__CustomerPriority__c'}">
+                                    <aura:if isTrue="{!v.sortAsc}">
+                                        <i class="fas fa-arrow-up fa-sm assignee-color"></i>
+                                        <span class="tooltip-text">Priority <span class="middle-dot"></span> Sorted A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                        <aura:set attribute="else">
+                                            <i class="fas fa-arrow-down fa-sm assignee-color"></i>
+                                            <span class="tooltip-text">Priority <span class="middle-dot"></span> Sorted Z <i class="fas fa-long-arrow-alt-right"></i> A</span>
+                                        </aura:set>
+                                    </aura:if>
+                                    
+                                    <aura:set attribute="else">
+                                        <i class="fas fa-arrow-down fa-sm sortIcon"></i>
+                                        <span class="tooltip-text">Priority <span class="middle-dot"></span> Sort A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                    </aura:set>
+                                </aura:if>
+                            </span>
+                    
+                        </div>
+                        <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_1-of-12 slds-large-size_1-of-12">Action</div>
+                    </aura:if>
+                    
+                    <!-- end of   Nurture      -->
+
+                    <aura:if isTrue="{!v.strStatus == 'Pre-Qualified'}">
+                        <!-- <div class="slds-col slds-form-element add-width slds-size_1-of-12 slds-medium-size_1-of-12 slds-large-size_1-of-12 "></div> -->
+                        <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_3-of-12 slds-large-size_3-of-12 pl-32 slds-is-relative">
+                            <div class="flag-header sortColumn" onclick="{!c.sortTableServer}" id="Sic"> 
+                                <span class="hover-tooltip d-flex align-items-center">
+                                    <i class="material-icons">flag</i>
+                                    <aura:if isTrue="{!v.sortField=='Sic'}">
+                                        <aura:if isTrue="{!v.sortAsc}">
+                                            <i class="fas fa-arrow-up fa-sm assignee-color"></i>
+                                            <span class="tooltip-text">Sorted A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                            <aura:set attribute="else">
+                                                <i class="fas fa-arrow-down fa-sm assignee-color"></i>
+                                                <span class="tooltip-text">Sorted Z <i class="fas fa-long-arrow-alt-right"></i> A</span>
+                                            </aura:set>
+                                        </aura:if>
+                                        <aura:set attribute="else">
+                                            <i class="fas fa-arrow-down fa-sm sortIcon"></i>
+                                            <span class="tooltip-text left-100">Sort A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                        </aura:set>
+                                    </aura:if>
+                                </span>
+                                
+                            </div>
+                            <div class="sortColumn" onclick="{!c.sortTableServer}" id="FirstName">
+                                <span class="hover-tooltip d-flex-gap-5">
+                                    <div class="slds-truncate">Client Name</div>
+                                    <aura:if isTrue="{!v.sortField=='FirstName'}">
+                                        <aura:if isTrue="{!v.sortAsc}">
+                                            <i class="fas fa-arrow-up fa-sm assignee-color"></i>
+                                            <span class="tooltip-text">Client Name <span class="middle-dot"></span> Sorted A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                            <aura:set attribute="else">
+                                                <i class="fas fa-arrow-down fa-sm assignee-color"></i>
+                                                <span class="tooltip-text">Client Name <span class="middle-dot"></span> Sorted Z <i class="fas fa-long-arrow-alt-right"></i> A</span>
+                                            </aura:set>
+                                        </aura:if>
+                                        <aura:set attribute="else">
+                                            <i class="fas fa-arrow-down fa-sm sortIcon"></i>
+                                            <span class="tooltip-text">Client Name <span class="middle-dot"></span> Sort A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                        </aura:set>
+                                    </aura:if>
+                                </span>
+                            </div>
+                        </div>
+                        <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_2-of-12 slds-large-size_2-of-12 sortColumn" onclick="{!c.sortTableServer}" id="inflooens__Loan_Type__c">
+                            <span class="hover-tooltip d-flex-gap-5">
+                                <div class="slds-truncate">Loan Type</div>
+                                <aura:if isTrue="{!v.sortField=='inflooens__Loan_Type__c'}">
+                                    <aura:if isTrue="{!v.sortAsc}">
+                                        <i class="fas fa-arrow-up fa-sm assignee-color"></i>
+                                        <span class="tooltip-text">Loan Type <span class="middle-dot"></span> Sorted A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                        <aura:set attribute="else">
+                                            <i class="fas fa-arrow-down fa-sm assignee-color"></i>
+                                            <span class="tooltip-text">Loan Type <span class="middle-dot"></span> Sorted Z <i class="fas fa-long-arrow-alt-right"></i> A</span>
+                                        </aura:set>
+                                    </aura:if>
+                                    <aura:set attribute="else">
+                                        <i class="fas fa-arrow-down fa-sm sortIcon"></i>
+                                        <span class="tooltip-text">Loan Type <span class="middle-dot"></span> Sort A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                    </aura:set>
+                                </aura:if>
+                            </span>
+                        </div>
+                        <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_2-of-12 slds-large-size_2-of-12 sortColumn" onclick="{!c.sortTableServer}" id="AccountSource">
+                            <span class="hover-tooltip d-flex-gap-5">
+                                <div class="slds-truncate">Source</div>
+                                <aura:if isTrue="{!v.sortField=='AccountSource'}">
+                                    <aura:if isTrue="{!v.sortAsc}">
+                                        <i class="fas fa-arrow-up fa-sm assignee-color"></i>
+                                        <span class="tooltip-text">Source <span class="middle-dot"></span> Sorted A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                        <aura:set attribute="else">
+                                            <i class="fas fa-arrow-down fa-sm assignee-color"></i>
+                                            <span class="tooltip-text">Source <span class="middle-dot"></span> Sorted Z <i class="fas fa-long-arrow-alt-right"></i> A</span>
+                                        </aura:set>
+                                    </aura:if>
+                                    <aura:set attribute="else">
+                                        <i class="fas fa-arrow-down fa-sm sortIcon"></i>
+                                        <span class="tooltip-text">Source <span class="middle-dot"></span> Sort A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                    </aura:set>
+                                </aura:if>
+                            </span>
+                        </div>
+                        <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_2-of-12 slds-large-size_2-of-12 sortColumn slds-truncate"> <!-- onclick="{!c.sortTable}" id="preApprovalProcessData-AccountSource" -->
+                            Document Status 
+                        </div>
+                        <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_2-of-12 slds-large-size_2-of-12 sortColumn" onclick="{!c.sortTableServer}" id="inflooens__CustomerPriority__c">
+                            <span class="hover-tooltip d-flex-gap-5">
+                                <div class="slds-truncate">Priority</div>
+                                <aura:if isTrue="{!v.sortField=='inflooens__CustomerPriority__c'}">
+                                    <aura:if isTrue="{!v.sortAsc}">
+                                        <i class="fas fa-arrow-up fa-sm assignee-color"></i>
+                                        <span class="tooltip-text">Priority <span class="middle-dot"></span> Sorted A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                        <aura:set attribute="else">
+                                            <i class="fas fa-arrow-down fa-sm assignee-color"></i>
+                                            <span class="tooltip-text">Priority <span class="middle-dot"></span> Sorted Z <i class="fas fa-long-arrow-alt-right"></i> A</span>
+                                        </aura:set>
+                                    </aura:if>
+                                    
+                                    <aura:set attribute="else">
+                                        <i class="fas fa-arrow-down fa-sm sortIcon"></i>
+                                        <span class="tooltip-text">Priority <span class="middle-dot"></span> Sort A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                    </aura:set>
+                                </aura:if>
+                            </span>
+                        </div>
+                        <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_1-of-12 slds-large-size_1-of-12" >Action</div>
+                    </aura:if>
+                    <aura:if isTrue="{!v.strStatus == 'Pre-approved'}">
+                        <!-- <div class="slds-col slds-form-element add-width slds-size_1-of-12 slds-medium-size_1-of-12 slds-large-size_1-of-12 "></div> -->
+                        <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_3-of-12 slds-large-size_3-of-12 pl-32 slds-is-relative">
+                            <div class="flag-header sortColumn" onclick="{!c.sortTableServer}" id="Sic"> 
+                                <span class="hover-tooltip d-flex align-items-center">
+                                    <i class="material-icons">flag</i>
+                                    <aura:if isTrue="{!v.sortField=='Sic'}">
+                                        <aura:if isTrue="{!v.sortAsc}">
+                                            <i class="fas fa-arrow-up fa-sm assignee-color"></i>
+                                            <span class="tooltip-text">Sorted A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                            <aura:set attribute="else">
+                                                <i class="fas fa-arrow-down fa-sm assignee-color"></i>
+                                                <span class="tooltip-text">Sorted Z <i class="fas fa-long-arrow-alt-right"></i> A</span>
+                                            </aura:set>
+                                        </aura:if>
+                                        <aura:set attribute="else">
+                                            <i class="fas fa-arrow-down fa-sm sortIcon"></i>
+                                            <span class="tooltip-text left-100">Sort A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                        </aura:set>
+                                    </aura:if>
+                                </span>
+                            </div>
+                            <div class="sortColumn" onclick="{!c.sortTableServer}" id="FirstName">
+                                <span class="hover-tooltip d-flex-gap-5">
+                                    <div class="slds-truncate">Client Name</div>
+                                    <aura:if isTrue="{!v.sortField=='FirstName'}">
+                                        <aura:if isTrue="{!v.sortAsc}">
+                                            <i class="fas fa-arrow-up fa-sm assignee-color"></i>
+                                            <span class="tooltip-text">Client Name <span class="middle-dot"></span> Sorted A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                            <aura:set attribute="else">
+                                                <i class="fas fa-arrow-down fa-sm assignee-color"></i>
+                                                <span class="tooltip-text">Client Name <span class="middle-dot"></span> Sorted Z <i class="fas fa-long-arrow-alt-right"></i> A</span>
+                                            </aura:set>
+                                        </aura:if>
+                                        <aura:set attribute="else">
+                                            <i class="fas fa-arrow-down fa-sm sortIcon"></i>
+                                            <span class="tooltip-text">Client Name <span class="middle-dot"></span> Sort A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                        </aura:set>
+                                    </aura:if>
+                                </span>
+                            </div>
+                        </div>
+                        <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_2-of-12 slds-large-size_2-of-12 sortColumn" onclick="{!c.sortTableServer}" id="inflooens__Loan_Type__c">
+                            <span class="hover-tooltip d-flex-gap-5">
+                                <div class="slds-truncate">Loan Type</div>
+                                <aura:if isTrue="{!v.sortField=='inflooens__Loan_Type__c'}">
+                                    <aura:if isTrue="{!v.sortAsc}">
+                                        <i class="fas fa-arrow-up fa-sm assignee-color"></i>
+                                        <span class="tooltip-text">Loan Type <span class="middle-dot"></span> Sorted A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                        <aura:set attribute="else">
+                                            <i class="fas fa-arrow-down fa-sm assignee-color"></i>
+                                            <span class="tooltip-text">Loan Type <span class="middle-dot"></span> Sorted Z <i class="fas fa-long-arrow-alt-right"></i> A</span>
+                                        </aura:set>
+                                    </aura:if>
+                                    <aura:set attribute="else">
+                                        <i class="fas fa-arrow-down fa-sm sortIcon"></i>
+                                        <span class="tooltip-text">Loan Type <span class="middle-dot"></span> Sort A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                    </aura:set>
+                                </aura:if>
+                            </span>
+                        </div>
+                        <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_2-of-12 slds-large-size_2-of-12 sortColumn" onclick="{!c.sortTableServer}" id="inflooens__Loan_Amount__c">
+                            <span class="hover-tooltip d-flex-gap-5">
+                                <div class="slds-truncate">Amount</div>
+                                <aura:if isTrue="{!v.sortField=='inflooens__Loan_Amount__c'}">
+                                    <aura:if isTrue="{!v.sortAsc}">
+                                        <i class="fas fa-arrow-up fa-sm assignee-color"></i>
+                                        <span class="tooltip-text">Amount <span class="middle-dot"></span> Sorted A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                        <aura:set attribute="else">
+                                            <i class="fas fa-arrow-down fa-sm assignee-color"></i>
+                                            <span class="tooltip-text">Amount <span class="middle-dot"></span> Sorted Z <i class="fas fa-long-arrow-alt-right"></i> A</span>
+                                        </aura:set>
+                                    </aura:if>
+                                    <aura:set attribute="else">
+                                        <i class="fas fa-arrow-down fa-sm sortIcon"></i>
+                                        <span class="tooltip-text">Amount <span class="middle-dot"></span> Sort A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                    </aura:set>
+                                </aura:if>
+                            </span>
+                        </div>
+                        <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_2-of-12 slds-large-size_2-of-12 sortColumn" onclick="{!c.sortTableServer}" id="inflooens__ExpirationDate__c">
+                            <span class="hover-tooltip d-flex-gap-5">
+                                <div class="slds-truncate">Expires On</div>
+                                <aura:if isTrue="{!v.sortField=='inflooens__ExpirationDate__c'}">
+                                    <aura:if isTrue="{!v.sortAsc}">
+                                        <i class="fas fa-arrow-up fa-sm assignee-color"></i>
+                                        <span class="tooltip-text">Expires On <span class="middle-dot"></span> Sorted A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                        <aura:set attribute="else">
+                                            <i class="fas fa-arrow-down fa-sm assignee-color"></i>
+                                            <span class="tooltip-text">Expires On <span class="middle-dot"></span> Sorted Z <i class="fas fa-long-arrow-alt-right"></i> A</span>
+                                        </aura:set>
+                                    </aura:if>
+                                    <aura:set attribute="else">
+                                        <i class="fas fa-arrow-down fa-sm sortIcon"></i>
+                                        <span class="tooltip-text">Expires On <span class="middle-dot"></span> Sort A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                    </aura:set>
+                                </aura:if>
+                            </span>
+                        </div>
+                        <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_2-of-12 slds-large-size_2-of-12 sortColumn" onclick="{!c.sortTableServer}" id="inflooens__CustomerPriority__c">
+                            <span class="hover-tooltip d-flex-gap-5">
+                                <div class="slds-truncate">Priority</div>
+                                <aura:if isTrue="{!v.sortField=='inflooens__CustomerPriority__c'}">
+                                    <aura:if isTrue="{!v.sortAsc}">
+                                        <i class="fas fa-arrow-up fa-sm assignee-color"></i>
+                                        <span class="tooltip-text">Priority <span class="middle-dot"></span> Sorted A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                        <aura:set attribute="else">
+                                            <i class="fas fa-arrow-down fa-sm assignee-color"></i>
+                                            <span class="tooltip-text">Priority <span class="middle-dot"></span> Sorted Z <i class="fas fa-long-arrow-alt-right"></i> A</span>
+                                        </aura:set>
+                                    </aura:if>
+                                    
+                                    <aura:set attribute="else">
+                                        <i class="fas fa-arrow-down fa-sm sortIcon"></i>
+                                        <span class="tooltip-text">Priority <span class="middle-dot"></span> Sort A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                    </aura:set>
+                                </aura:if>
+                            </span>
+                        </div>
+                        <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_1-of-12 slds-large-size_1-of-12">Action</div>
+                    </aura:if>
+                    <aura:if isTrue="{!v.strStatus != 'Pre-approved'}">
+                        <aura:if isTrue="{!v.strStatus != 'Pre-Qualified'}">
+                            <aura:if isTrue="{!v.strStatus != 'Leads'}">
+                                <aura:if isTrue="{!v.strStatus != 'Nurture'}">
+                                <!-- <div class="slds-col slds-form-element add-width slds-size_1-of-12 slds-medium-size_1-of-12 slds-large-size_1-of-12 "></div> -->
+                                <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_3-of-12 slds-large-size_3-of-12 pl-32 slds-is-relative" >
+                                    <div class="flag-header sortColumn" onclick="{!c.sortTableServer}" id="flag"> 
+                                        <span class="hover-tooltip d-flex align-items-center">
+                                            <i class="material-icons">flag</i>
+                                            <aura:if isTrue="{!v.sortField=='flag'}">
+                                                <aura:if isTrue="{!v.sortAsc}">
+                                                    <i class="fas fa-arrow-up fa-sm assignee-color"></i>
+                                                    <span class="tooltip-text">Sorted A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                                    <aura:set attribute="else">
+                                                        <i class="fas fa-arrow-down fa-sm assignee-color"></i>
+                                                        <span class="tooltip-text">Sorted Z <i class="fas fa-long-arrow-alt-right"></i> A</span>
+                                                    </aura:set>
+                                                </aura:if>
+                                                <aura:set attribute="else">
+                                                    <i class="fas fa-arrow-down fa-sm sortIcon"></i>
+                                                    <span class="tooltip-text left-100">Sort A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                                </aura:set>
+                                            </aura:if>
+                                        </span>
+                                    </div>
+                                    <div class="sortColumn" onclick="{!c.sortTableServer}" id="ClientName">
+                                        <span class="hover-tooltip d-flex-gap-5">
+                                            <div class="slds-truncate">Client Name</div>
+                                            <aura:if isTrue="{!v.sortField=='ClientName'}">
+                                                <aura:if isTrue="{!v.sortAsc}">
+                                                    <i class="fas fa-arrow-up fa-sm assignee-color"></i>
+                                                    <span class="tooltip-text">Client Name <span class="middle-dot"></span> Sorted A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                                    <aura:set attribute="else">
+                                                        <i class="fas fa-arrow-down fa-sm assignee-color"></i>
+                                                        <span class="tooltip-text">Client Name <span class="middle-dot"></span> Sorted Z <i class="fas fa-long-arrow-alt-right"></i> A</span>
+                                                    </aura:set>
+                                                </aura:if>
+                                                <aura:set attribute="else">
+                                                    <i class="fas fa-arrow-down fa-sm sortIcon"></i>
+                                                    <span class="tooltip-text">Client Name <span class="middle-dot"></span> Sort A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                                </aura:set>
+                                            </aura:if>
+                                        </span>
+                                    </div>
+                                </div>  
+                                <aura:iteration items="{!v.columns}" var="item" indexVar="key">
+                                    <!-- <div  class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_2-of-12 slds-large-size_2-of-12 slds-truncate" onclick="{!c.sortTable}" id="{!'acctList-columnAPIValues'+key}">-->
+                                    <div  class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_2-of-12 slds-large-size_2-of-12 sortColumn sortDynamicCol" onclick="{!c.sortTableServer}" id="{!item.apiName}">
+                                        <span class="hover-tooltip d-flex align-items-center">
+                                            <div class="slds-truncate header-title">{!item.Name}</div>
+                                            <aura:if isTrue="{!v.sortField == item.apiName}">
+                                                <aura:if isTrue="{!v.sortAsc}">
+                                                    <i class="fas fa-arrow-up fa-sm assignee-color"></i>
+                                                    <span class="tooltip-text">{!item.Name}  <span class="middle-dot"></span> Sorted A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                                    <aura:set attribute="else">
+                                                        <i class="fas fa-arrow-down fa-sm assignee-color"></i>
+                                                        <span class="tooltip-text">{!item.Name}  <span class="middle-dot"></span> Sorted Z <i class="fas fa-long-arrow-alt-right"></i> A</span>
+                                                    </aura:set>
+                                                </aura:if>
+                                                
+                                                <aura:set attribute="else">
+                                                    <i class="fas fa-arrow-down fa-sm sortIcon"></i>
+                                                    <span class="tooltip-text">{!item.Name}  <span class="middle-dot"></span> Sort A <i class="fas fa-long-arrow-alt-right"></i> Z</span>
+                                                </aura:set>
+                                            </aura:if>
+                                        </span>
+                                        <!--id="{!'acctList-columnAPIValues'+key}"-->
+                                        <!--<aura:if isTrue="{!v.sortField=='acctList-columnAPIValues'+key}">-->
+                                        <!-- <span id="{!'acctList-columnAPIValues-'+key}" class="shortF">
+                                                    {!v.sortAsc ? '&#8593;' : '&#8595;'}
+                                                </span>         -->
+                                        <!--  <aura:if isTrue="{!v.sortField==v.sortFieldD}">
+             {!v.sortFieldD}                                                   
+                                                    <span>
+                                                        {!v.sortAsc ? '&#8593;' : '&#8595;'}
+                                                    </span>
+                                                    
+                                                </aura:if>   --> 
+                                        <!--  <aura:if isTrue="{!v.sortColumn slds-truncate==item.columnVal}">
+                                                <span>
+                                                    <aura:if isTrue="{!v.sortAsc}">
+                                                        ▲
+                                                        <aura:set attribute="else">
+                                                            ▼
+                                                        </aura:set>
+                                                    </aura:if>
+                                                </span>
+                                            </aura:if>-->
+                                        
+                                    </div>
+                                </aura:iteration>      
+                                <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_1-of-12 slds-large-size_1-of-12">Action</div>
+                            </aura:if>
+                        </aura:if>
+                    </aura:if>
+                </aura:if>
+                </div>  <!-- End table-heading -->
+                
+                <div class="slds-form-element__group ">                                                                                                 
+                    <div style="" class="table-data"> <!--margin-bottom:40px;-->
+                        <aura:if isTrue="{!v.strStatus == 'Leads'}">
+                            <aura:iteration items="{!v.accData}" var="item" indexVar="key">
+
+                                <div class="row small-padding-left slds-form-element__row slds-grid slds-wrap slds-align_absolute-center img-colors slds-is-relative funnelTable-row">
+                                    <aura:if isTrue="{!and(item.FirstName == 'Bill',item.LastName == 'Smith')}">
+                                        <div class="list-flag-leads"> 
+                                            <img src="{!$Resource.thermostat}" class="cold-lead"/>
+                                        </div>
+                                    </aura:if>
+                                    <aura:if isTrue="{!and(item.FirstName == 'Kathy',item.LastName == 'Campbell')}">
+                                        <div class="list-flag-leads"> 
+                                            <img src="{!$Resource.thermostat}" class="warm-lead"/>
+                                        </div>
+                                    </aura:if>
+                                    <aura:if isTrue="{!and(item.FirstName == 'Rene',item.LastName == 'Cannon')}">
+                                        <div class="list-flag-leads"> 
+                                            <img src="{!$Resource.thermostat}" class="hot-lead"/>
+                                        </div>
+                                    </aura:if>
+                                    <!-- Alexander Lewis -->
+                                    <aura:if isTrue="{!and(item.FirstName == 'Alexander',item.LastName == 'Lewis')}">
+                                        <div class="list-flag-leads"> 
+                                            <img src="{!$Resource.flaminHot}"/>
+                                        </div>
+                                    </aura:if>
+                                    <!-- Donna Miller -->
+                                    <aura:if isTrue="{!and(item.FirstName == 'Donna',item.LastName == 'Miller')}">
+                                        <div class="list-flag-leads"> 
+                                            <img src="{!$Resource.thermostat}" class="warm-lead"/>
+                                        </div>
+                                    </aura:if>
+                                    <!-- Clifford Porter -->
+                                    <aura:if isTrue="{!and(item.FirstName == 'Clifford',item.LastName == 'Porter')}">
+                                        <div class="list-flag-leads"> 
+                                            <img src="{!$Resource.thermostat}" class="warm-lead"/>
+                                        </div>
+                                    </aura:if>
+                                    <!-- Mildred Haris -->
+                                    <aura:if isTrue="{!and(item.FirstName == 'Mildred',item.LastName == 'Haris')}">
+                                        <div class="list-flag-leads"> 
+                                            <img src="{!$Resource.thermostat}" class="warm-lead"/>
+                                        </div>
+                                    </aura:if>
+                                    <!-- Albert Thompson -->
+                                    <aura:if isTrue="{!and(item.FirstName == 'Albert',item.LastName == 'Thompson')}">
+                                        <div class="list-flag-leads"> 
+                                            <img src="{!$Resource.thermostat}" class="cold-lead"/>
+                                        </div>
+                                    </aura:if>
+                                    <!-- Diane Lewis -->
+                                    <aura:if isTrue="{!and(item.FirstName == 'Diane',item.LastName == 'Lewis')}">
+                                        <div class="list-flag-leads"> 
+                                            <img src="{!$Resource.thermostat}" class="dormant-lead"/>
+                                        </div>
+                                    </aura:if>
+                                    <!-- Anthony Miller -->
+                                    <aura:if isTrue="{!and(item.FirstName == 'Anthony',item.LastName == 'Miller')}">
+                                        <div class="list-flag-leads"> 
+                                            <img src="{!$Resource.thermostat}" class="hot-lead"/>
+                                        </div>
+                                    </aura:if>
+                                    <!-- Darrin Briggs -->
+                                    <aura:if isTrue="{!and(item.FirstName == 'Darrin',item.LastName == 'Briggs')}">
+                                        <div class="list-flag-leads"> 
+                                            <img src="{!$Resource.flaminHot}"/>
+                                        </div>
+                                    </aura:if>
+                                    <!-- Jackson Mattson -->
+                                    <aura:if isTrue="{!and(item.FirstName == 'Jackson',item.LastName == 'Mattson')}">
+                                        <div class="list-flag-leads"> 
+                                            <img src="{!$Resource.flaminHot}"/>
+                                        </div>
+                                    </aura:if>
+                                    <!-- Mario Lane -->
+                                    <aura:if isTrue="{!and(item.FirstName == 'Mario',item.LastName == 'Lane')}">
+                                        <div class="list-flag-leads"> 
+                                            <img src="{!$Resource.flaminHot}"/>
+                                        </div>
+                                    </aura:if>
+                                    <!-- Jerry Thomson -->
+                                    <aura:if isTrue="{!and(item.FirstName == 'Jerry',item.LastName == 'Thomson')}">
+                                        <div class="list-flag-leads"> 
+                                            <img src="{!$Resource.thermostat}" class="cold-lead"/>
+                                        </div>
+                                    </aura:if>
+                                    <!-- <div class="slds-col slds-form-element slds-size_1-of-12 reduce-width slds-medium-size_1-of-12 slds-large-size_1-of-12 slds-truncate font-light">
+                                    <div class="list-flag-leads rem-margin-padding"> 
+                                        <div class="iconImg rm-padding">
+                                            <img src="{!$Resource.thermostat}"/>
+                                        </div>
+                                    </div>
+                                </div> -->
+                                    <div class="list-flag-home"> 
+                                        <aura:if isTrue="{!item.inflooens__Lead_Priority__c == 'Hot'}">
+                                            <i class="material-icons red-icon">flag</i>
+                                        </aura:if>
+                                        <aura:if isTrue="{!item.inflooens__Lead_Priority__c == 'Flaming Hot'}">
+                                            <i class="material-icons red-icon">flag</i>
+                                        </aura:if>
+                                        <aura:if isTrue="{!item.inflooens__Lead_Priority__c == 'Warm'}">
+                                            <i class="material-icons yellow-icon">flag</i>                   
+                                        </aura:if>
+                                        <aura:if isTrue="{!item.inflooens__Lead_Priority__c == 'Cold'}">
+                                            <i class="material-icons green-icon">flag</i>
+                                        </aura:if>
+                                        <aura:if isTrue="{!item.inflooens__Lead_Priority__c == ''}">
+                                            <i class="material-icons green-icon">flag</i>
+                                        </aura:if>
+                                        <aura:if isTrue="{!item.inflooens__Lead_Priority__c == null}">
+                                            <i class="material-icons green-icon">flag</i>
+                                        </aura:if>
+                                    </div>
+                                    <div class="slds-col slds-form-element slds-p-left_small slds-size_1-of-12 slds-medium-size_3-of-12 slds-large-size_3-of-12 slds-truncate text-capitalize pl-32">
+                                        <a href="{!'/' + item.Id}" class="font-light" target="_blank">
+                                            <lightning:formattedText value="{!item.FirstName}" />&nbsp;<lightning:formattedText value="{!item.LastName}" />
+                                        </a>
+                                    </div>
+                                    <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_2-of-12 slds-large-size_2-of-12 slds-truncate font-light">
+                                        <aura:if isTrue="{!item.inflooens__Loan_Type__c != null}">
+                                            <lightning:formattedText value="{!item.inflooens__Loan_Type__c}" />&nbsp;
+                                            <aura:set attribute="else">
+                                                -
+                                            </aura:set>
+                                        </aura:if>
+                                    </div>
+                                    <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_2-of-12 slds-large-size_2-of-12 slds-truncate font-light">
+                                        <aura:if isTrue="{!item.AccountSource != null}">
+                                            <lightning:formattedText value="{!item.AccountSource}" />&nbsp;
+                                            <aura:set attribute="else">
+                                                -
+                                            </aura:set>
+                                        </aura:if>
+                                    </div>
+                                    <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_2-of-12 slds-large-size_2-of-12 slds-truncate font-light">
+                                        <aura:if isTrue="{!item.AccountSource == 'Business Referral'}">
+                                            <aura:if isTrue="{!item.inflooens__Referred_By__c != null}">    
+                                                <a href="{!'/' + item.inflooens__Partner_Referred_ByCon__c}" class="font-light" target="_blank">
+                                                    <lightning:formattedText value="{!item.inflooens__Referred_By__c}"/>
+                                                </a>
+                                                <aura:set attribute="else">
+                                                    -
+                                                </aura:set>
+                                            </aura:if> 
+                                            <aura:set attribute="else">
+                                                <aura:if isTrue="{!item.inflooens__Referred_By__c != null}">     
+                                                    <a href="{!'/' + item.inflooens__Client_Referred_By__c}" class="font-light" target="_blank">
+                                                        <lightning:formattedText value="{!item.inflooens__Referred_By__c}"/>
+                                                    </a>    
+                                                    <aura:set attribute="else">
+                                                        -
+                                                    </aura:set> 
+                                                </aura:if>   
+                                                
+                                            </aura:set>
+                                        </aura:if>    
+                                    </div>
+                                    <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_2-of-12 slds-large-size_2-of-12 slds-truncate font-light">
+                                        <aura:if isTrue="{!item.inflooens__CustomerPriority__c != null}">
+                                            <lightning:formattedText value="{!item.inflooens__CustomerPriority__c}" />&nbsp;
+                                            <aura:set attribute="else">
+                                                -
+                                            </aura:set>
+                                        </aura:if>
+                                    </div>
+                                    <div class="slds-col tb-row slds-form-element slds-size_1-of-12 slds-medium-size_1-of-12 slds-large-size_1-of-12 font-light">
+                                        <c:Quickaction aura:id="quaction" clientId="{!item.Id}" activityKey="{!key}" strStatus="{!v.strStatus}" personObj="{!item}"/>
+                                    </div> 
+                                </div>
+                            </aura:iteration> 
+                            <aura:if isTrue="{!v.accData.length == 0}">
+                                <div class="leadNotFound slds-align_absolute-center">
+                                    <img src="{!$Resource.NotFoundTask}"/>
+                                    <h1 class="slds-m-top_large font-reg" style="color:#a2a2a2;font-size:var(--fLarge);">No Records Found Matching Your Search</h1>
+                                </div>
+                            </aura:if> 
+                        </aura:if>
+                        
+                        <aura:if isTrue="{!v.strStatus == 'Pre-Qualified'}">
+                            <aura:iteration items="{!v.preApprovalProcessData}" var="item" indexVar="key">
+                                <div class="row small-padding-left slds-form-element__row slds-grid slds-wrap slds-align_absolute-center flags-color slds-is-relative funnelTable-row">
+                                    <!-- <div class="list-flag-home"> 
+                                        <aura:if isTrue="{!item.Sic == 'Red'}">
+                                            <i class="material-icons red-icon">flag</i>
+                                        </aura:if>
+                                        <aura:if isTrue="{!item.Sic == 'Yellow'}">
+                                            <i class="material-icons yellow-icon">flag</i>                   
+                                        </aura:if>
+                                        <aura:if isTrue="{!item.Sic == 'Green'}">
+                                            <i class="material-icons green-icon">flag</i>
+                                        </aura:if>
+                                    </div> -->
+
+                                    <div class="list-flag-home"> 
+                                        <aura:if isTrue="{!item.inflooens__Lead_Priority__c == 'Hot'}">
+                                            <i class="material-icons red-icon">flag</i>
+                                        </aura:if>
+                                        <aura:if isTrue="{!item.inflooens__Lead_Priority__c == 'Flaming Hot'}">
+                                            <i class="material-icons red-icon">flag</i>
+                                        </aura:if>
+                                        <aura:if isTrue="{!item.inflooens__Lead_Priority__c == 'Warm'}">
+                                            <i class="material-icons yellow-icon">flag</i>                   
+                                        </aura:if>
+                                        <aura:if isTrue="{!item.inflooens__Lead_Priority__c == 'Cold'}">
+                                            <i class="material-icons green-icon">flag</i>
+                                        </aura:if>
+                                        <aura:if isTrue="{!item.inflooens__Lead_Priority__c == ''}">
+                                            <i class="material-icons green-icon">flag</i>
+                                        </aura:if>
+                                        <aura:if isTrue="{!item.inflooens__Lead_Priority__c == null}">
+                                            <i class="material-icons green-icon">flag</i>
+                                        </aura:if>
+                                    </div>
+                                    
+                                    <div class="slds-col slds-form-element pl-32 slds-p-left_small slds-size_1-of-12 slds-medium-size_3-of-12 slds-large-size_3-of-12 slds-truncate text-capitalize">
+                                        <a href="{!'/' + item.Id}" class="font-light" target="_blank">
+                                            <lightning:formattedText value="{!item.FirstName}" />&nbsp;<lightning:formattedText value="{!item.LastName}" />
+                                        </a>
+                                    </div>
+                                    <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_2-of-12 slds-large-size_2-of-12 slds-truncate font-light">
+                                        <aura:if isTrue="{!item.inflooens__Loan_Type__c != null}">
+                                            <lightning:formattedText value="{!item.inflooens__Loan_Type__c}" />&nbsp;
+                                            <aura:set attribute="else">
+                                                -
+                                            </aura:set>
+                                        </aura:if>
+                                    </div>
+                                    <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_2-of-12 slds-large-size_2-of-12 slds-truncate font-light">
+                                        <aura:if isTrue="{!item.AccountSource != null}">
+                                            <lightning:formattedText value="{!item.AccountSource}" />&nbsp;
+                                            <aura:set attribute="else">
+                                                -
+                                            </aura:set>
+                                        </aura:if>
+                                    </div>
+                                    <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_2-of-12 slds-large-size_2-of-12 font-light">
+                                        <!--Requested: <lightning:formattedNumber value="{!item.inflooens__Requested_Docs__c}" /><br/>
+                                    Review Pending: <lightning:formattedNumber value="{!item.inflooens__Review_Pending_Docs__c}" /><br/>
+                                    Accepted: <lightning:formattedNumber value="{!item.inflooens__Accepted_Docs__c}" /><br/>
+                                    Rejected: <lightning:formattedNumber value="{!item.inflooens__Rejected_Docs__c}" />-->
+                                        <!-- <div class="slds-grid slds-wrap">
+                                        
+                                            <!- -<div class="status_tiers circle documents-not-received">{!item.inflooens__Requested_Docs__c}</div>
+                                            <div class="status_tiers circle documents-pending">{!item.inflooens__Review_Pending_Docs__c}</div>
+                                            <div class="status_tiers circle documents-approved">{!item.inflooens__Accepted_Docs__c}</div>
+                                            <div class="status_tiers circle documents-rejected">{!item.inflooens__Rejected_Docs__c}</div>- ->
+                                            <lightning:formattedNumber title="Requested" value="{!item.inflooens__Requested_Docs__c}" class="gray-bg"/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;    
+                                            <lightning:formattedNumber title="Review Pending" value="{!item.inflooens__Review_Pending_Docs__c}" class="yellow-bg"/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+                                            <lightning:formattedNumber title="Accepted" value="{!item.inflooens__Accepted_Docs__c}" class="green-bg"/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;  
+                                            <lightning:formattedNumber title="Rejected" value="{!item.inflooens__Rejected_Docs__c}" class="red-bg"/> 
+                                    </div> -->
+                                        <div class="d-flex-gap-5 tableCircleBg">
+                                            
+                                            <div class="gray-bg slds-is-relative tooltip-hover-blue"> 
+                                                <span>{!item.inflooens__Requested_Docs__c}</span> 
+                                                <div class="showHelpText">
+                                                    <p>Requested</p>
+                                                </div>
+                                            </div>
+                                            <div class="yellow-bg slds-is-relative tooltip-hover-blue">
+                                                <span>{!item.inflooens__Review_Pending_Docs__c}</span>
+                                                <div class="showHelpText">
+                                                    <p>Review Pending</p>
+                                                </div>
+                                            </div>
+                                            <div class="red-bg slds-is-relative tooltip-hover-blue">
+                                                <span>{!item.inflooens__Rejected_Docs__c}</span>
+                                                <div class="showHelpText">
+                                                    <p>Rejected</p>
+                                                </div>
+                                            </div>
+                                            <div class="green-bg slds-is-relative tooltip-hover-blue">
+                                                <span>{!item.inflooens__Accepted_Docs__c}</span>
+                                                <div class="showHelpText">
+                                                    <p>Accepted</p>
+                                                </div>
+                                            </div>
+                                            
+                                        </div>
+                                    </div>
+                                    <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_2-of-12 slds-large-size_2-of-12 slds-truncate font-light">
+                                        <aura:if isTrue="{!item.inflooens__CustomerPriority__c != null}">
+                                            <lightning:formattedText value="{!item.inflooens__CustomerPriority__c}" />&nbsp;
+                                            <aura:set attribute="else">
+                                                -
+                                            </aura:set>
+                                        </aura:if>
+                                    </div>
+                                    <div class="slds-col tb-row slds-form-element slds-size_1-of-12 slds-medium-size_1-of-12 slds-large-size_1-of-12 font-light">
+                                        <c:Quickaction aura:id="quaction" clientId="{!item.Id}" activityKey="{!key}" strStatus="{!v.strStatus}" personObj="{!item}"/> 
+                                        
+                                    </div> 
+                                </div>
+                            </aura:iteration>  
+                            <aura:if isTrue="{!v.preApprovalProcessData.length == 0}">
+                                <div class="leadNotFound slds-align_absolute-center ">
+                                    <img src="{!$Resource.NotFoundTask}"/>
+                                    <h1 class="slds-m-top_large font-reg" style="color:#a2a2a2;font-size:var(--fLarge);">No Records Found Matching Your Search</h1>
+                                </div>
+                            </aura:if> 
+                        </aura:if>
+                        
+                        <aura:if isTrue="{!v.strStatus == 'Pre-approved'}">
+                            <aura:iteration items="{!v.preApprovedData}" var="item" indexVar="key">
+                                <div class="row small-padding-left slds-form-element__row slds-grid slds-wrap slds-align_absolute-center flags-color slds-is-relative">
+                                    <div class="list-flag-home"> 
+                                        <aura:if isTrue="{!item.Sic == 'Red'}">
+                                            <i class="material-icons red-icon">flag</i>
+                                        </aura:if>
+                                        <aura:if isTrue="{!item.Sic == 'Yellow'}">
+                                            <i class="material-icons yellow-icon">flag</i>                   
+                                        </aura:if>
+                                        <aura:if isTrue="{!item.Sic == 'Green'}">
+                                            <i class="material-icons green-icon">flag</i>
+                                        </aura:if>
+                                    </div>
+                                    <div class="slds-col slds-form-element pl-32 slds-p-left_small slds-size_1-of-12 slds-medium-size_3-of-12 slds-large-size_3-of-12 slds-truncate text-capitalize">
+                                        <!-- <div class="list-flag-home"> 
+                                        
+                                    </div> -->
+                                        <a href="{!'/' + item.Id}" class="font-light" target="_blank">
+                                            <lightning:formattedText value="{!item.FirstName}" />&nbsp;<lightning:formattedText value="{!item.LastName}" />
+                                        </a>
+                                    </div>
+                                    <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_2-of-12 slds-large-size_2-of-12 slds-truncate font-light">
+                                        <aura:if isTrue="{!item.inflooens__Loan_Type__c != null}">
+                                            <lightning:formattedText value="{!item.inflooens__Loan_Type__c}" />&nbsp;
+                                            <aura:set attribute="else">
+                                                -
+                                            </aura:set>
+                                        </aura:if>
+                                    </div>
+                                    <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_2-of-12 slds-large-size_2-of-12 slds-truncate font-light">
+                                        <aura:if isTrue="{!item.inflooens__Loan_Amount__c != null}">
+                                            $<lightning:formattedNumber value="{!item.inflooens__Loan_Amount__c}" />&nbsp;
+                                            <aura:set attribute="else">
+                                                -
+                                            </aura:set>
+                                        </aura:if>
+                                    </div>
+                                    <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_2-of-12 slds-large-size_2-of-12 slds-truncate font-light">
+                                        <aura:if isTrue="{!item.inflooens__ExpirationDate__c != null}">
+                                            <lightning:formattedDateTime value="{!item.inflooens__ExpirationDate__c}" />&nbsp;
+                                            <aura:set attribute="else">
+                                                -
+                                            </aura:set>
+                                        </aura:if>
+                                    </div>
+                                    <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_2-of-12 slds-large-size_2-of-12 slds-truncate font-light">
+                                        <aura:if isTrue="{!item.inflooens__CustomerPriority__c != null}">
+                                            <lightning:formattedText value="{!item.inflooens__CustomerPriority__c}" />&nbsp;
+                                            <aura:set attribute="else">
+                                                -
+                                            </aura:set>
+                                        </aura:if>
+                                    </div>
+                                    <div class="slds-col tb-row slds-form-element slds-size_1-of-12 slds-medium-size_1-of-12 slds-large-size_1-of-12 font-light">
+                                        <c:Quickaction aura:id="quaction" clientId="{!item.Id}" activityKey="{!key}" strStatus="{!v.strStatus}" personObj="{!item}"/>
+                                        
+                                    </div> 
+                                </div>
+                            </aura:iteration> 
+                            <aura:if isTrue="{!v.preApprovedData.length == 0}">
+                                <div class="leadNotFound slds-align_absolute-center ">
+                                    <img src="{!$Resource.NotFoundTask}"/>
+                                    <h1 class="slds-m-top_large font-reg" style="color:#a2a2a2;font-size:var(--fLarge);">No Records Found Matching Your Search</h1>
+                                </div>
+                            </aura:if>  
+                        </aura:if>
+                        
+                        <!--    Nurture-->
+                        <aura:if isTrue="{!v.strStatus == 'Nurture'}">
+                            <aura:iteration items="{!v.NurtureData}" var="item" indexVar="key">
+                                <div class="row small-padding-left slds-form-element__row slds-grid slds-wrap slds-align_absolute-center flags-color slds-is-relative funnelTable-row">
+
+                            <div class="list-flag-home"> 
+                                <aura:if isTrue="{!item.inflooens__Lead_Priority__c == 'Hot'}">
+                                    <i class="material-icons red-icon">flag</i>
+                                </aura:if>
+                                <aura:if isTrue="{!item.inflooens__Lead_Priority__c == 'Flaming Hot'}">
+                                    <i class="material-icons red-icon">flag</i>
+                                </aura:if>
+                                <aura:if isTrue="{!item.inflooens__Lead_Priority__c == 'Warm'}">
+                                    <i class="material-icons yellow-icon">flag</i>                   
+                                </aura:if>
+                                <aura:if isTrue="{!item.inflooens__Lead_Priority__c == 'Cold'}">
+                                    <i class="material-icons green-icon">flag</i>
+                                </aura:if>
+                                <aura:if isTrue="{!item.inflooens__Lead_Priority__c == ''}">
+                                    <i class="material-icons green-icon">flag</i>
+                                </aura:if>
+                                <aura:if isTrue="{!item.inflooens__Lead_Priority__c == null}">
+                                    <i class="material-icons green-icon">flag</i>
+                                </aura:if>
+                            </div>
+
+                            <div class="slds-col slds-form-element slds-p-left_small slds-size_1-of-12 slds-medium-size_3-of-12 slds-large-size_3-of-12 slds-truncate text-capitalize pl-32">
+                                <a href="{!'/' + item.Id}" class="font-light" target="_blank">
+                                    <lightning:formattedText value="{!item.FirstName}" />&nbsp;<lightning:formattedText value="{!item.LastName}" />
+                                </a>
+                            </div>
+                            <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_2-of-12 slds-large-size_2-of-12 slds-truncate font-light">
+                                <aura:if isTrue="{!item.inflooens__Loan_Type__c != null}">
+                                    <lightning:formattedText value="{!item.inflooens__Loan_Type__c}" />&nbsp;
+                                    <aura:set attribute="else">
+                                        -
+                                    </aura:set>
+                                </aura:if>
+                            </div>
+                            <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_2-of-12 slds-large-size_2-of-12 slds-truncate font-light">
+                                <aura:if isTrue="{!item.AccountSource != null}">
+                                    <lightning:formattedText value="{!item.AccountSource}" />&nbsp;
+                                    <aura:set attribute="else">
+                                        -
+                                    </aura:set>
+                                </aura:if>
+                            </div>
+                            <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_2-of-12 slds-large-size_2-of-12 slds-truncate font-light">
+                                <aura:if isTrue="{!item.AccountSource == 'Business Referral'}">
+                                    <aura:if isTrue="{!item.inflooens__Referred_By__c != null}">    
+                                        <a href="{!'/' + item.inflooens__Partner_Referred_ByCon__c}" class="font-light" target="_blank">
+                                            <lightning:formattedText value="{!item.inflooens__Referred_By__c}"/>
+                                        </a>
+                                        <aura:set attribute="else">
+                                            -
+                                        </aura:set>
+                                    </aura:if> 
+                                    <aura:set attribute="else">
+                                        <aura:if isTrue="{!item.inflooens__Referred_By__c != null}">     
+                                            <a href="{!'/' + item.inflooens__Client_Referred_By__c}" class="font-light" target="_blank">
+                                                <lightning:formattedText value="{!item.inflooens__Referred_By__c}"/>
+                                            </a>    
+                                            <aura:set attribute="else">
+                                                -
+                                            </aura:set> 
+                                        </aura:if>   
+                                        
+                                    </aura:set>
+                                </aura:if>    
+                            </div>
+                            <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_2-of-12 slds-large-size_2-of-12 slds-truncate font-light">
+                                <aura:if isTrue="{!item.inflooens__CustomerPriority__c != null}">
+                                    <lightning:formattedText value="{!item.inflooens__CustomerPriority__c}" />&nbsp;
+                                    <aura:set attribute="else">
+                                        -
+                                    </aura:set>
+                                </aura:if>
+                            </div>
+                            <div class="slds-col tb-row slds-form-element slds-size_1-of-12 slds-medium-size_1-of-12 slds-large-size_1-of-12 font-light">
+                                <c:Quickaction aura:id="quaction" clientId="{!item.Id}" activityKey="{!key}" strStatus="{!v.strStatus}" personObj="{!item}"/>
+                            </div> 
+                            </div>
+                        </aura:iteration>
+                        <aura:if isTrue="{!v.NurtureData.length == 0}">
+                            <div class="leadNotFound slds-align_absolute-center ">
+                                <img src="{!$Resource.NotFoundTask}"/>
+                                <h1 class="slds-m-top_large font-reg" style="color:#a2a2a2;font-size:var(--fLarge);">No Records Found Matching Your Search</h1>
+                            </div>
+                        </aura:if>  
+
+                        </aura:if>
+
+                        <aura:if isTrue="{!v.strStatus != 'Leads'}">
+                            <aura:if isTrue="{!v.strStatus != 'Pre-Qualified'}">
+                                <aura:if isTrue="{!v.strStatus != 'Pre-approved'}">
+                                    <aura:if isTrue="{!v.strStatus != 'Nurture'}">
+                                    <aura:iteration items="{!v.acctList}" var="item" indexVar="key">
+                                        <div class="row small-padding-left slds-form-element__row slds-grid slds-wrap slds-align_absolute-center flags-color slds-is-relative">
+                                            <div class="list-flag-home"> 
+                                                <aura:if isTrue="{!item.flag == 'Red'}">
+                                                    <i class="material-icons red-icon">flag</i>
+                                                </aura:if>
+                                                <aura:if isTrue="{!item.flag == 'Yellow'}">
+                                                    <i class="material-icons yellow-icon">flag</i>                   
+                                                </aura:if>
+                                                <aura:if isTrue="{!item.flag == 'Green'}">
+                                                    <i class="material-icons green-icon">flag</i>
+                                                </aura:if>
+                                            </div>                                 
+                                            <div class="slds-col slds-form-element pl-32 slds-p-left_small slds-size_1-of-12 slds-medium-size_3-of-12 slds-large-size_3-of-12 slds-truncate">
+                                                
+                                                <a href="{!'/' + item.ClientId}" class="font-light" target="_blank">
+                                                    <lightning:formattedText value="{!item.ClientName}" />
+                                                </a>
+                                            </div>
+                                            <aura:iteration items="{!item.columnAPIValues}" var="columnVal" indexVar="key">
+                                                <aura:if isTrue="{!columnVal == 'ClientDocument'}">
+                                                    
+                                                    <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_2-of-12 slds-large-size_2-of-12 font-light">
+                                                        
+                                                        <!-- <lightning:formattedNumber title="Requested" value="{!item.requestedDocsClient}" class="gray-bg"/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;    
+                                                    <lightning:formattedNumber title="Review Pending" value="{!item.reviewDocsClient}" class="yellow-bg"/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+                                                    <lightning:formattedNumber title="Accepted" value="{!item.acceptedDocsClient}" class="green-bg"/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;  
+                                                    <lightning:formattedNumber title="Rejected" value="{!item.rejectedDocsClient}" class="red-bg"/>  -->
+                                                        <div class="d-flex-gap-5 tableCircleBg">
+                                                            
+                                                            <div class="gray-bg slds-is-relative tooltip-hover-blue"> 
+                                                                <span>{!item.requestedDocsClient}</span> 
+                                                                <div class="showHelpText">
+                                                                    <p>Requested</p>
+                                                                </div>
+                                                            </div>
+                                                            <div class="yellow-bg slds-is-relative tooltip-hover-blue">
+                                                                
+                                                                <span>{!item.reviewDocsClient}</span>
+                                                                <div class="showHelpText">
+                                                                    <p>Review Pending</p>
+                                                                </div>
+                                                            </div>
+                                                            <div class="red-bg slds-is-relative tooltip-hover-blue">
+                                                                <span>{!item.rejectedDocsClient}</span>
+                                                                <div class="showHelpText">
+                                                                    <p>Rejected</p>
+                                                                </div>
+                                                            </div>
+                                                            <div class="green-bg slds-is-relative tooltip-hover-blue">
+                                                                <span>{!item.acceptedDocsClient}</span>
+                                                                <div class="showHelpText">
+                                                                    <p>Accepted</p>
+                                                                </div>
+                                                            </div>
+                                                            
+                                                            
+                                                            
+                                                        </div>
+                                                    </div>
+                                                </aura:if>
+                                                <aura:if isTrue="{!columnVal == 'PartnerDocument'}">
+                                                    <!-- <lightning:formattedNumber title="Requested" value="{!item.requestedDocsPartner}" class="gray-bg"/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;    
+                                                <lightning:formattedNumber title="Review Pending" value="{!item.reviewDocsPartner}" class="yellow-bg"/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+                                                <lightning:formattedNumber title="Accepted" value="{!item.acceptedDocsPartner}" class="green-bg"/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;  
+                                                <lightning:formattedNumber title="Rejected" value="{!item.rejectedDocsPartner}" class="red-bg"/>  -->
+                                                    <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_2-of-12 slds-large-size_2-of-12 font-light">
+                                                        <div class="d-flex-gap-5 tableCircleBg">
+                                                            
+                                                            <div class="gray-bg slds-is-relative tooltip-hover-blue"> 
+                                                                <span>{!item.requestedDocsPartner}</span> 
+                                                                <div class="showHelpText">
+                                                                    <p>Requested</p>
+                                                                </div>
+                                                            </div>
+                                                            <div class="yellow-bg slds-is-relative tooltip-hover-blue">
+                                                                <span>{!item.reviewDocsPartner}</span>
+                                                                <div class="showHelpText">
+                                                                    <p>Review Pending</p>
+                                                                </div>
+                                                            </div>
+                                                            <div class="red-bg slds-is-relative tooltip-hover-blue">
+                                                                <span>{!item.rejectedDocsPartner}</span>
+                                                                <div class="showHelpText">
+                                                                    <p>Rejected</p>
+                                                                </div>
+                                                            </div>
+                                                            <div class="green-bg slds-is-relative tooltip-hover-blue">
+                                                                <span>{!item.acceptedDocsPartner}</span>
+                                                                <div class="showHelpText">
+                                                                    <p>Accepted</p>
+                                                                </div>
+                                                            </div>
+                                                            
+                                                        </div>
+                                                    </div>
+                                                </aura:if>
+                                                <aura:if isTrue="{!columnVal == 'TaskStatus'}">
+                                                    <!-- <lightning:formattedNumber title="On track" value="{!item.tasksOnTrack}" class="gray-bg"/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;    
+                                                <lightning:formattedNumber title="Requires Attention" value="{!item.tasksAttention}" class="yellow-bg"/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp; 
+                                                <lightning:formattedNumber title="Completed" value="{!item.tasksCompleted}" class="green-bg"/>&nbsp;&nbsp;&nbsp;&nbsp;&nbsp;  
+                                                <lightning:formattedNumber title="At Risk" value="{!item.tasksRisk}" class="red-bg"/>  -->
+                                                    <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_2-of-12 slds-large-size_2-of-12 font-light">
+                                                        <div class="d-flex-gap-5 tableCircleBorder">
+                                                            
+                                                            <div class="red-border slds-is-relative tooltip-hover-blue">
+                                                                <span>{!item.tasksRisk}</span>
+                                                                <div class="showHelpText">
+                                                                    <p>At Risk</p>
+                                                                </div>
+                                                            </div>
+                                                            <div class="yellow-border slds-is-relative tooltip-hover-blue">
+                                                                <span>{!item.tasksAttention}</span>
+                                                                <div class="showHelpText">
+                                                                    <p>Requires Attention</p>
+                                                                </div>
+                                                            </div>
+                                                            <div class="green-border slds-is-relative tooltip-hover-blue"> 
+                                                                <span>{!item.tasksOnTrack}</span> 
+                                                                <div class="showHelpText">
+                                                                    <p>On track</p>
+                                                                </div>
+                                                            </div>
+                                                            <div class="purple-border slds-is-relative tooltip-hover-blue">
+                                                                <span>{!item.tasksCompleted}</span>
+                                                                <div class="showHelpText">
+                                                                    <p>Completed</p>
+                                                                </div>
+                                                            </div>
+                                                            
+                                                        </div>
+                                                    </div>
+                                                </aura:if>
+                                                
+                                                <aura:if isTrue="{!columnVal == 'ConditionStatus'}">
+                                                    <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_2-of-12 slds-large-size_2-of-12 font-light slds-truncate">
+                                                        {!item.approvedConditions}/{!item.totalConditions}
+                                                    </div>
+                                                </aura:if>
+                                                <aura:if isTrue="{!columnVal != 'PartnerDocument'}">
+                                                    <aura:if isTrue="{!columnVal != 'ClientDocument'}">
+                                                        <aura:if isTrue="{!columnVal != 'TaskStatus'}">
+                                                            <aura:if isTrue="{!columnVal != 'ConditionStatus'}">
+                                                                <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_2-of-12 slds-large-size_2-of-12 font-light slds-truncate">
+                                                                    {!columnVal}
+                                                                    
+                                                                </div>          
+                                                            </aura:if>
+                                                        </aura:if>
+                                                    </aura:if>
+                                                </aura:if>
+                                                <!-- </div> -->
+                                            </aura:iteration> 
+                                            <!--<div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_3-of-12 slds-large-size_3-of-12 slds-truncate font-light">
+                                            <lightning:formattedText value="{!item.source}" />&nbsp;
+                                        </div>
+                                        <div class="slds-col slds-form-element slds-size_1-of-12 slds-medium-size_3-of-12 slds-large-size_3-of-12 slds-truncate font-light">
+                                            <aura:if isTrue="{!item.source == 'Business Referral'}">
+                                                <a href="{!'/' + item.partnerReferredBy}" class="font-light" target="_blank">
+                                                <lightning:formattedText value="{!item.referredBy}"/>
+                                                </a>
+                                            <aura:set attribute="else">
+                                                <a href="{!'/' + item.clientReferredBy}" class="font-light" target="_blank">
+                                                <lightning:formattedText value="{!item.referredBy}"/>
+                                                </a>    
+                                            </aura:set>
+                                            </aura:if>
+                                        </div>-->
+                                            
+                                            <div class="slds-col tb-row slds-form-element slds-size_1-of-12 slds-medium-size_1-of-12 slds-large-size_1-of-12 font-light">
+                                                 <c:Quickaction aura:id="quaction" loanStatus="{!v.strStatus}" loanId="{!item.LoanId}" clientId="{!item.ClientId}" activityKey="{!key}" strStatus="{!v.strStatus}" personObj="{!item}"/>
+                                            </div>
+                                        </div>
+                                    </aura:iteration> 
+                                    <aura:if isTrue="{!v.strStatus != 'Leads'}">
+                                        <aura:if isTrue="{!v.strStatus != 'Pre-approval in Process'}">
+                                            <aura:if isTrue="{!v.strStatus != 'Pre-approved'}">
+                                                <aura:if isTrue="{!v.strStatus != 'Pre-Qualified'}">
+                                                    <aura:if isTrue="{!v.strStatus != 'Nurture'}">
+                                                        <aura:if isTrue="{!v.acctList.length == 0}">
+                                                            <div class="leadNotFound slds-align_absolute-center">
+                                                                <img src="{!$Resource.NotFoundTask}"/>
+                                                                <h1 class="slds-m-top_large font-reg" style="color:#a2a2a2;font-size:var(--fLarge);">No Records Found Matching Your Search</h1>
+                                                            </div>
+                                                        </aura:if> 
+                                                    </aura:if>
+                                                </aura:if>
+                                            </aura:if>
+                                        </aura:if>
+                                    </aura:if>  
+                                </aura:if>
+                            </aura:if>
+                        </aura:if>
+                        </aura:if>
+                        <div class="table-paginate font-reg d-flex-gap-5">  
+                            <div class="paginate-pageNumbers">
+                                <span class="popover_font"> {!v.recordsFrom} - {!v.recordsTo} of {!v.total} </span>
+                                <ul class="first-lastpage">
+                                    <li>
+                                        <button class="paginate-jumpbutton" disabled="{!v.page == 1}" onclick="{!c.newest}">First Page</button>
+                                    </li>
+                                    <li>
+                                        <button class="paginate-jumpbutton" disabled="{!v.page == v.pages}" onclick="{!c.Oldest}">Last Page</button>
+                                    </li>
+                                </ul>
+                            </div>
+                            <div class="hover-tooltip slds-p-left_small arrow-hov">
+                                <lightning:button disabled="{!v.page == 1}" class="pg-but paginate-button" variant="base" label="Previous Page" onclick="{! c.navigate }"> 
+                                    <!-- <lightning:icon iconName="utility:chevronleft" size="x-small" alternativeText="Previous Page"/>   -->
+                                    <span class="material-icons">
+                                        chevron_left
+                                    </span>
+                                </lightning:button>
+                                <span class="tooltip-text">Newer</span>
+                            </div>
+                            <div class="hover-tooltip slds-p-left_small arrow-hov">
+                                <lightning:button disabled="{!v.page == v.pages}" class="pg-but paginate-button" variant="base" onclick="{! c.navigate }">
+                                    <!-- <lightning:icon iconName="utility:chevronright" aura:id="previousPage" size="x-small" alternativeText="Next Page"/> -->
+                                    <span class="material-icons">
+                                        chevron_right
+                                    </span>
+                                </lightning:button>
+                                <span class="tooltip-text">Older</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </aura:if>
+    <aura:if isTrue="{!v.isFullScreen}">
+        <div class="slds-scrollable slds-table-cust cust-table text-capitalize" style="height:auto;">   
+            <!--
+    <lightning:datatable data="{! v.acctList }"
+                         columns="{! v.columns }"
+                         keyField="id"
+                         hideCheckboxColumn="true"
+                         onrowaction="{! c.handleRowAction }"
+                         />
+        -->
+            <div class="slds-grid-table slds-form-element__group " >
+                <div class="slds-form-element__row slds-grid slds-wrap table-heading header">
+                    <div class="slds-col slds-form-element slds-size_1-of-4 slds-medium-size_1-of-4 slds-large-size_1-of-4 slds-p-left_small">Customer</div>
+                    <div class="slds-col slds-form-element slds-size_1-of-4 slds-medium-size_1-of-4 slds-large-size_1-of-4 ">Source</div>
+                    <div class="slds-col slds-form-element slds-size_1-of-4 slds-medium-size_1-of-4 slds-large-size_1-of-4">Referred By</div>
+                    <div class="slds-col slds-form-element slds-size_1-of-4 slds-medium-size_1-of-4 slds-large-size_1-of-4">Action</div>
+                </div>  <!-- End table-heading -->
+                
+                <div class="slds-form-element__group ">
+                    <div>
+                        <aura:iteration items="{!v.acctList}" var="item" indexVar="key">
+                            <div class="row slds-form-element__row slds-grid slds-wrap">
+                                <div class="slds-col slds-p-left_small slds-form-element slds-size_1-of-4 slds-medium-size_1-of-4 slds-large-size_1-of-4 ellipsis" style="text-align: left;">
+                                    <a href="{!'/' + item.ClientId}">
+                                        <lightning:formattedText value="{!item.ClientName}" />
+                                    </a>
+                                </div>
+                                <div class="slds-col slds-form-element slds-size_1-of-4 slds-medium-size_1-of-4 slds-large-size_1-of-4 ellipsis" style="text-align: left;">
+                                    <lightning:formattedText value="{!item.source}" />&nbsp;
+                                </div>
+                                <div class="slds-col slds-form-element slds-size_1-of-4 slds-medium-size_1-of-4 slds-large-size_1-of-4 ellipsis" style="text-align: left;">
+                                    <!--lightning:formattedText value="{!item.referredBy}"/-->
+                                    <aura:if isTrue="{!item.source == 'Business Referral'}">
+                                        <a href="{!'/' + item.partnerReferredBy}" class="font-light" target="_blank">
+                                            <lightning:formattedText value="{!item.referredBy}"/>
+                                        </a>
+                                        <aura:set attribute="else">
+                                            <a href="{!'/' + item.clientReferredBy}" class="font-light" target="_blank">
+                                                <lightning:formattedText value="{!item.referredBy}"/>
+                                            </a>    
+                                        </aura:set>
+                                    </aura:if>
+                                </div>
+                                <div class="slds-col tb-row slds-form-element slds-size_1-of-12 slds-medium-size_2-of-12 slds-large-size_2-of-12 font-light">	
+                                    <c:Quickaction aura:id="quaction" personObj="{!item}"/>	
+                                </div> 
+                            </div>
+                        </aura:iteration>  
+                        
+                    </div>
+                </div>
+            </div>
+        </div>
+    </aura:if>
+    <!--<br/>-->
+    <!--
+    <aura:if isTrue="{!v.totalRecords > 0 }">
+        <c:LightningPaginator totalRecords="{!v.totalRecords}" aura:id="tableComp" />   
+    </aura:if>    
+    -->
+    <!--<br/>-->
+</aura:component>
